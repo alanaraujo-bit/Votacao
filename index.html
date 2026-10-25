@@ -219,6 +219,42 @@
     .lbl-pc { font-size: 12px; stroke-width: 3px; }
   }
 
+  /* probabilidades */
+  .prob-card { margin-top: 12px; padding: 22px; }
+  .prob-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .prob-head h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+  .prob-head .hint { font-size: 13px; color: var(--muted); }
+  .odds { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 16px; margin-top: 20px; }
+  .odds .o { min-width: 0; }
+  .odds .o.right { text-align: right; }
+  .odds .nm { font-size: 14px; font-weight: 600; display: inline-flex; gap: 8px; align-items: center; }
+  .odds .nm::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+  .odds .o.right .nm { flex-direction: row-reverse; }
+  .odds .pc { font-size: clamp(44px, 9vw, 92px); font-weight: 600; letter-spacing: -.055em; line-height: 1; margin-top: 8px; color: var(--c); }
+  .odds .vs { color: var(--faint); font-size: 13px; padding-bottom: 14px; text-align: center; }
+  .pbar { height: 12px; border-radius: 999px; display: flex; gap: 3px; margin-top: 18px; }
+  .pbar > div { border-radius: 999px; transition: width 1s cubic-bezier(.2,.8,.2,1); }
+  .verdict { margin-top: 14px; font-size: 15px; color: var(--text-2); line-height: 1.5; }
+  .verdict b { color: var(--text); font-weight: 600; }
+  .pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+  .pgrid .card { padding: 14px 16px; background: rgba(255,255,255,.02); }
+  .pgrid .big { font-size: 22px; }
+  .pcharts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; margin-top: 12px; }
+  .pcharts canvas { height: 200px; }
+  .ptable { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+  .ptable th { text-align: right; font-weight: 500; color: var(--faint); padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .ptable th:first-child, .ptable td:first-child { text-align: left; }
+  .ptable td { text-align: right; padding: 9px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .ptable tr:last-child td { border-bottom: 0; }
+  .ptable .chance { display: inline-block; width: 56px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); vertical-align: middle; margin-left: 6px; overflow: hidden; }
+  .ptable .chance i { display: block; height: 100%; }
+  .twrap { overflow-x: auto; }
+  .method { margin-top: 16px; font-size: 12px; color: var(--faint); line-height: 1.6; }
+  .method summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  @media (max-width: 860px) { .pgrid { grid-template-columns: 1fr; } .pcharts { grid-template-columns: 1fr; } }
+  .ptable .show-sm { display: none; }
+  @media (max-width: 560px) { .prob-card { padding: 16px; } .ptable .hide-sm { display: none; } .ptable .show-sm { display: inline; } .ptable .muted { color: var(--faint); font-size: 12px; } }
+
   /* modo TV: só o essencial, maior */
   body.tv .hide-tv { display: none !important; }
   body.tv .diff { font-size: clamp(90px, 20vw, 280px); }
@@ -305,6 +341,47 @@
       <div class="big" id="comp">—</div>
       <div class="sub" id="compSub">—</div>
     </div>
+  </div>
+
+  <div class="card prob-card" id="probCard">
+    <div class="prob-head">
+      <h3>Probabilidade de vitória</h3>
+      <span class="hint" id="probHint">Calculando cenários…</span>
+    </div>
+    <div class="odds">
+      <div class="o" id="oddA"><div class="nm">—</div><div class="pc">—</div></div>
+      <div class="vs">chance de<br>vencer</div>
+      <div class="o right" id="oddB"><div class="nm">—</div><div class="pc">—</div></div>
+    </div>
+    <div class="pbar"><div id="pbarA" style="width:50%"></div><div id="pbarB" style="width:50%"></div></div>
+    <div class="verdict" id="verdict"></div>
+
+    <div class="pgrid">
+      <div class="card"><h3>Resultado final projetado</h3><div class="big" id="projPct">—</div><div class="sub" id="projPctSub">—</div></div>
+      <div class="card"><h3>Diferença final projetada</h3><div class="big" id="projMargin">—</div><div class="sub" id="projMarginSub">—</div></div>
+      <div class="card"><h3>Os votos que faltam favorecem</h3><div class="big" id="projRem">—</div><div class="sub" id="projRemSub">—</div></div>
+    </div>
+
+    <div class="pcharts">
+      <div class="card"><h3>Distribuição da diferença final (cada barra = muitos cenários)</h3><canvas id="histo"></canvas></div>
+      <div class="card"><h3>Chance de vitória ao longo da apuração</h3><canvas id="probLine"></canvas></div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>Onde estão os votos que faltam</h3>
+      <div class="twrap"><table class="ptable" id="ptable"></table></div>
+    </div>
+
+    <details class="method">
+      <summary>Como a probabilidade é calculada</summary>
+      <p>A cada atualização dos estados, a página simula 20.000 finais possíveis para a apuração. Em cada estado ela estima quantos votos
+      válidos ainda faltam (a partir do que já foi apurado e do percentual de urnas) e sorteia como esses votos vão se dividir.
+      O ponto de partida é o resultado já apurado no estado; quando ainda há poucos votos contados, ele é misturado com o resultado do
+      1º turno daquele estado (entre os dois finalistas), corrigido pela mudança nacional. A incerteza é maior onde falta mais apurar,
+      e existe também um desvio nacional sorteado em cada cenário, que mexe em todos os estados na mesma direção (porque as urnas que
+      chegam por último costumam ser parecidas entre si). A chance de vitória é a fração de cenários em que cada candidato termina na frente.</p>
+      <p>É um modelo estatístico feito só com os dados da apuração. Não usa pesquisa, não é oficial e pode errar, principalmente no começo.</p>
+    </details>
   </div>
 
   <div class="card map-card" id="mapCard">
@@ -443,7 +520,7 @@
   if (params.get('ciclo')) cfg.ciclo = params.get('ciclo');
   if (params.get('eleicao')) cfg.eleicao = params.get('eleicao');
   let election = null;          // { ciclo, cd }
-  let proxyMode = store.get('proxy', 0);
+  let proxyMode = 0, directFailAt = 0;
   let last = null;              // último snapshot nacional
   let history = [];
   let states = {};
@@ -453,11 +530,13 @@
   let wakeLock = null;
 
   // ---------- rede ----------
+  // o parâmetro _= muda a cada busca: nem o navegador nem caches no caminho podem devolver uma cópia velha
+  const bust = (u) => u + (u.includes('?') ? '&' : '?') + '_=' + Date.now();
   const PROXIES = [
-    (u) => u,
+    (u) => bust(u),
     (u) => 'https://corsproxy.io/?url=' + encodeURIComponent(u + '?u=' + Date.now()),
     (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u + '?u=' + Date.now()),
-    (u) => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
+    (u) => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(bust(u)),
   ];
 
   // Em 2026 os arquivos podem vir como JSON puro ou assinados (JWS: cabeçalho.payload.assinatura).
@@ -476,18 +555,25 @@
   async function getJSON(url) {
     if (DEMO) return demoFetch(url);
     let lastErr;
+    // sempre tenta direto no TSE primeiro (é o mais rápido e o mais fresco); só pula o direto por 30s depois de uma falha
+    const start = proxyMode && Date.now() - directFailAt < 30000 ? proxyMode : 0;
     for (let i = 0; i < PROXIES.length; i++) {
-      const mode = (proxyMode + i) % PROXIES.length;
+      const mode = (start + i) % PROXIES.length;
       try {
-        // direto: 'no-cache' revalida com o TSE a cada vez (304 leve quando nada mudou); proxies: sem cache nenhum
-        const r = await fetch(PROXIES[mode](url), { cache: mode ? 'no-store' : 'no-cache', signal: AbortSignal.timeout(8000) });
+        const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 6000);
+        let r;
+        try { r = await fetch(PROXIES[mode](url), { cache: 'no-store', signal: ctl.signal }); }
+        finally { clearTimeout(timer); }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const j = decode(await r.text());
-        if (mode !== proxyMode) { proxyMode = mode; store.set('proxy', mode); }
+        proxyMode = mode;
         return j;
       } catch (e) {
         lastErr = e;
-        if (/HTTP 404/.test(e.message) && mode === 0) break; // o arquivo não existe; proxy não ajuda
+        if (mode === 0) {
+          if (/HTTP 404/.test(e.message)) break; // o arquivo não existe; proxy não ajuda
+          directFailAt = Date.now();
+        }
       }
     }
     throw lastErr;
@@ -519,10 +605,8 @@
     return { ciclo, cd: pick ? String(pick.cd) : DEFAULT_ELECTION.cd };
   }
 
-  const fileUrl = (uf) => {
-    const e = election.cd.padStart(6, '0');
-    return `${BASE}/${election.ciclo}/${election.cd}/dados/${uf}/${uf}-c0001-e${e}-u.json`;
-  };
+  const fileUrlFor = (cd, uf) => `${BASE}/${election.ciclo}/${cd}/dados/${uf}/${uf}-c0001-e${String(cd).padStart(6, '0')}-u.json`;
+  const fileUrl = (uf) => fileUrlFor(election.cd, uf);
 
   // Aceita o formato de 2026 (carg → agr → par → cand, com blocos s/e/v) e o antigo de 2022 (cand na raiz).
   function parse(j) {
@@ -533,15 +617,17 @@
       (car.agr || []).forEach(a => (a.par || []).forEach(p => (p.cand || []).forEach(c => raw.push(c))));
       (car.cand || []).forEach(c => raw.push(c));
     }
-    const cand = raw.map(c => ({
+    const all = raw.map(c => ({
       n: String(c.n), nm: firstName(c.nmu || c.nm), votes: num(c.vap), pct: num(c.pvap),
       elected: /^eleit/i.test(c.st || '') || (!j.carg && c.e === 's'),
-    })).sort((a, b) => b.votes - a.votes || num(a.n) - num(b.n)).slice(0, 2)
+    }));
+    const cand = all.slice().sort((a, b) => b.votes - a.votes || num(a.n) - num(b.n)).slice(0, 2)
       .sort((a, b) => num(a.n) - num(b.n));
     const sec = j.s && typeof j.s === 'object' ? j.s : j;
     const el = j.e && typeof j.e === 'object' ? j.e : { te: j.e, a: j.a, pa: j.pa, pc: j.pc };
     const vt = j.v && typeof j.v === 'object' ? j.v : j;
     return {
+      all,
       pst: num(sec.pst),
       when: [j.dg, j.hg].filter(Boolean).join(' '),
       cand,
@@ -870,6 +956,207 @@
   };
   buildMap();
 
+
+  // ---------- probabilidade (Monte Carlo) ----------
+  const SIMS = 20000;
+  let firstRound = null, firstTried = false, probHist = [], lastModel = null;
+  const probKey = () => 'prob:' + (DEMO ? 'demo' : election.ciclo + ':' + election.cd);
+
+  // gerador com semente fixa: mesmos dados de entrada dão o mesmo resultado (o número não "treme" à toa)
+  function rng(seed) {
+    let a = seed >>> 0, spare = null;
+    const u = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const n = () => {
+      if (spare != null) { const x = spare; spare = null; return x; }
+      let x, y, r; do { x = u() * 2 - 1; y = u() * 2 - 1; r = x * x + y * y; } while (!r || r >= 1);
+      const m = Math.sqrt(-2 * Math.log(r) / r); spare = y * m; return x * m;
+    };
+    return n;
+  }
+
+  // 1º turno, por estado, como referência para onde ainda há pouco voto contado
+  async function loadFirstRound() {
+    if (firstTried || !election || !last || last.cand.length < 2) return;
+    firstTried = true;
+    const cd1 = String(num(election.cd) - 1);
+    const [A, B] = last.cand, out = {};
+    await Promise.all(['br', ...UFS].map(async uf => {
+      try {
+        const j = parse(await getJSON(fileUrlFor(cd1, uf)));
+        const a = j.all.find(c => c.n === A.n), b = j.all.find(c => c.n === B.n);
+        if (a && b && a.votes + b.votes > 0) out[uf] = a.votes / (a.votes + b.votes);
+      } catch {}
+    }));
+    if (Object.keys(out).length > 5) firstRound = out;
+  }
+
+  function runModel() {
+    if (!last || last.cand.length < 2) return null;
+    const [A, B] = last.cand;
+    const ufs = UFS.filter(uf => states[uf]);
+    if (ufs.length < 10) return null;
+    let ca = 0, cb = 0;
+    const rows = ufs.map(uf => {
+      const s = states[uf];
+      const a = s.cand.find(c => c.n === A.n), b = s.cand.find(c => c.n === B.n);
+      const va = a ? a.votes : 0, vb = b ? b.votes : 0, n = va + vb, pst = Math.min(100, s.pst);
+      ca += va; cb += vb;
+      // votos válidos que faltam: proporcional ao que já saiu; sem nada apurado, estima pelo eleitorado
+      let rem = 0;
+      if (pst >= 100) rem = 0;
+      else if (pst > 0 && n > 0) rem = n * (100 - pst) / pst;
+      else if (s.e) rem = s.e * 0.79 * 0.94;
+      return { uf, va, vb, n, pst, rem, share: n ? va / n : NaN };
+    });
+    const natShare = ca + cb ? ca / (ca + cb) : 0.5;
+    const swing = firstRound && firstRound.br != null ? natShare - firstRound.br : 0;
+    const K = 150000; // quantos votos contados "valem" o mesmo que a referência do 1º turno
+    let remTotal = 0, expNet = 0;
+    rows.forEach(r => {
+      const prior = firstRound && firstRound[r.uf] != null ? Math.min(.95, Math.max(.05, firstRound[r.uf] + swing)) : natShare;
+      const w = r.n / (r.n + K);
+      r.mean = r.n ? w * r.share + (1 - w) * prior : prior;
+      const left = 1 - r.pst / 100;
+      r.sd = 0.012 + 0.06 * left + (r.n ? 0 : 0.03);   // incerteza do estado sobre os votos que faltam
+      r.vsd = 0.03 + 0.12 * left;                         // incerteza sobre quantos votos faltam
+      r.net = r.rem * (2 * r.mean - 1);
+      remTotal += r.rem; expNet += r.net;
+    });
+    const pstNat = last.pst;
+    const natSd = 0.004 + 0.025 * (1 - pstNat / 100);
+    const seed = Math.round(ca + cb * 7) % 2147483647;
+    const N = rng(seed);
+    const margins = new Float64Array(SIMS);
+    const stateWinsA = Object.fromEntries(rows.map(r => [r.uf, 0]));
+    let winsA = 0, sumA = 0, sumTot = 0;
+    for (let i = 0; i < SIMS; i++) {
+      const z = N() * natSd;
+      let fa = ca, fb = cb;
+      for (const r of rows) {
+        if (r.rem <= 0) { if (r.va > r.vb) stateWinsA[r.uf]++; continue; }
+        const sh = Math.min(.99, Math.max(.01, r.mean + z + N() * r.sd));
+        const v = Math.max(0, r.rem * (1 + N() * r.vsd));
+        const xa = v * sh, xb = v - xa;
+        fa += xa; fb += xb;
+        if (r.va + xa > r.vb + xb) stateWinsA[r.uf]++;
+      }
+      margins[i] = fa - fb;
+      if (fa > fb) winsA++;
+      sumA += fa; sumTot += fa + fb;
+    }
+    const sorted = Float64Array.from(margins).sort();
+    const q = (p) => sorted[Math.min(SIMS - 1, Math.floor(p * SIMS))];
+    const totMed = sumTot / SIMS;
+    return {
+      A, B, pA: winsA / SIMS, rows, remTotal, expNet, ca, cb, margins: sorted,
+      mP10: q(.1), mP50: q(.5), mP90: q(.9),
+      shareMed: (q(.5) / totMed + 1) / 2, shareP10: (q(.1) / totMed + 1) / 2, shareP90: (q(.9) / totMed + 1) / 2,
+      stateP: Object.fromEntries(Object.entries(stateWinsA).map(([k, v]) => [k, v / SIMS])),
+      usedFirstRound: !!firstRound,
+    };
+  }
+
+  const pctTxt = (p) => p >= .999 ? '>99,9%' : p <= .001 ? '<0,1%' : (p * 100).toLocaleString('pt-BR', { maximumFractionDigits: p > .99 || p < .01 ? 1 : 0 }) + '%';
+
+  function renderProb() {
+    const m = runModel();
+    if (!m) return;
+    lastModel = m;
+    const { A, B } = m, ca = colorOf(A, 0), cb = colorOf(B, 1);
+    const pB = 1 - m.pA;
+    $('oddA').style.setProperty('--c', ca); $('oddB').style.setProperty('--c', cb);
+    $('oddA').querySelector('.nm').textContent = A.nm; $('oddB').querySelector('.nm').textContent = B.nm;
+    $('oddA').querySelector('.pc').textContent = pctTxt(m.pA); $('oddB').querySelector('.pc').textContent = pctTxt(pB);
+    $('pbarA').style.width = (m.pA * 100) + '%'; $('pbarA').style.background = ca;
+    $('pbarB').style.width = (pB * 100) + '%'; $('pbarB').style.background = cb;
+    $('probHint').textContent = `${fmt.format(SIMS)} cenários simulados · ${m.usedFirstRound ? 'com referência do 1º turno' : 'só com a apuração'}`;
+
+    const fav = m.pA >= .5 ? A : B, und = fav === A ? B : A, pf = Math.max(m.pA, pB);
+    const curLead = m.ca >= m.cb ? A : B;
+    const word = pf >= .99 ? 'praticamente certa' : pf >= .9 ? 'muito provável' : pf >= .75 ? 'provável' : pf >= .6 ? 'levemente favorável' : 'indefinida, cara ou coroa';
+    let v = `Vitória de <b>${fav.nm}</b> é <b>${word}</b>.`;
+    if (curLead !== fav) v += ` Hoje ${curLead.nm} está na frente, mas os votos que faltam apontam <b>virada de ${fav.nm}</b>.`;
+    else if (pf < .99) v += ` ${und.nm} vira em cerca de <b>${pctTxt(1 - pf)}</b> dos cenários.`;
+    $('verdict').innerHTML = v;
+
+    const pa = (x) => fmt2.format(x * 100) + '%';
+    $('projPct').innerHTML = `<span style="color:${ca}">${pa(m.shareMed)}</span> <span style="color:var(--faint)">×</span> <span style="color:${cb}">${pa(1 - m.shareMed)}</span>`;
+    $('projPctSub').textContent = `${A.nm} deve terminar entre ${pa(Math.min(m.shareP10, m.shareP90))} e ${pa(Math.max(m.shareP10, m.shareP90))} (80% dos cenários).`;
+    const ml = m.mP50 >= 0 ? A : B;
+    $('projMargin').innerHTML = `<span style="color:${m.mP50 >= 0 ? ca : cb}">${ml.nm} +${short(Math.abs(m.mP50))}</span>`;
+    const rng80 = (x) => (x >= 0 ? A.nm : B.nm) + ' +' + short(Math.abs(x));
+    $('projMarginSub').textContent = `80% dos cenários: de ${rng80(m.mP10)} a ${rng80(m.mP90)}.`;
+    const nl = m.expNet >= 0 ? A : B;
+    $('projRem').innerHTML = m.remTotal < 1 ? 'Apuração encerrada' : `<span style="color:${m.expNet >= 0 ? ca : cb}">${nl.nm}</span>`;
+    $('projRemSub').textContent = m.remTotal < 1 ? '' :
+      `Faltam ~${short(m.remTotal)} votos válidos. Pelo perfil dos estados onde eles estão, devem render ~${short(Math.abs(m.expNet))} votos de saldo para ${nl.nm}.`;
+
+    // tabela: estados que mais vão mexer na diferença
+    const rows = m.rows.filter(r => r.rem > 0).sort((x, y) => Math.abs(y.net) - Math.abs(x.net)).slice(0, 10);
+    $('ptable').innerHTML = `<tr><th>Estado</th><th class="hide-sm">Apurado</th><th>Faltam</th><th>Saldo esperado</th><th class="hide-sm">Chance no estado</th></tr>` +
+      (rows.length ? rows.map(r => {
+        const col = r.net >= 0 ? ca : cb, who = r.net >= 0 ? A : B, p = m.stateP[r.uf], ps = p >= .5 ? p : 1 - p, pc = p >= .5 ? ca : cb;
+        return `<tr><td><b class="hide-sm">${UF_FULL[r.uf] || r.uf.toUpperCase()}</b><b class="show-sm">${r.uf === 'zz' ? 'EXT' : r.uf.toUpperCase()}</b> <span class="show-sm muted">${fmt.format(Math.round(r.pst))}%</span></td><td class="hide-sm">${fmt.format(Math.round(r.pst))}%</td><td>${short(r.rem)}</td>
+          <td style="color:${col}">${who.nm} +${short(Math.abs(r.net))}</td>
+          <td class="hide-sm"><span style="color:${pc}">${(p >= .5 ? A : B).nm} ${pctTxt(ps)}</span><span class="chance"><i style="width:${ps * 100}%;background:${pc}"></i></span></td></tr>`;
+      }).join('') : '<tr><td colspan="5" class="muted">Nenhum voto faltando.</td></tr>');
+
+    if (!probHist.length || probHist[probHist.length - 1].pst !== last.pst) {
+      probHist.push({ pst: last.pst, p: m.pA }); store.set(probKey(), probHist);
+    } else probHist[probHist.length - 1].p = m.pA;
+    drawHisto(); drawProbLine();
+  }
+
+  function canvasCtx(id) {
+    const cv = $(id), ctx = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
+    const W = cv.clientWidth, H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    ctx.font = '500 11px Inter, system-ui';
+    return { ctx, W, H };
+  }
+
+  function drawHisto() {
+    const m = lastModel; if (!m) return;
+    const { ctx, W, H } = canvasCtx('histo'), ca = colorOf(m.A, 0), cb = colorOf(m.B, 1);
+    const lo = Math.min(m.margins[Math.floor(SIMS * .002)], 0), hi = Math.max(m.margins[Math.floor(SIMS * .998)], 0);
+    const span = Math.max(1, hi - lo) * 1.08, x0 = lo - span * .04;
+    const bins = 60, cnt = new Array(bins).fill(0);
+    for (const v of m.margins) { const k = Math.floor((v - x0) / span * bins); if (k >= 0 && k < bins) cnt[k]++; }
+    const max = Math.max(...cnt), padB = 22, bw = W / bins;
+    const X = (v) => (v - x0) / span * W;
+    cnt.forEach((c, k) => {
+      const mid = x0 + (k + .5) / bins * span, h = c / max * (H - padB - 10);
+      ctx.fillStyle = mid >= 0 ? ca : cb; ctx.globalAlpha = .85;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(k * bw + 1, H - padB - h, bw - 2, h, 2) : ctx.rect(k * bw + 1, H - padB - h, bw - 2, h); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(0), 4); ctx.lineTo(X(0), H - padB); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#8a8f98'; ctx.textAlign = X(0) > W - 60 ? 'right' : X(0) < 60 ? 'left' : 'center'; ctx.fillText('empate', X(0) + (X(0) > W - 60 ? -4 : X(0) < 60 ? 4 : 0), 12);
+    ctx.textAlign = 'left'; ctx.fillStyle = cb; ctx.fillText('← ' + m.B.nm, 4, H - 6);
+    ctx.textAlign = 'right'; ctx.fillStyle = ca; ctx.fillText(m.A.nm + ' →', W - 4, H - 6);
+  }
+
+  function drawProbLine() {
+    if (!lastModel) return;
+    const { ctx, W, H } = canvasCtx('probLine'), ca = colorOf(lastModel.A, 0), cb = colorOf(lastModel.B, 1);
+    const padL = 42, padB = 22, padT = 8;
+    const X = (x) => padL + x / 100 * (W - padL - 6), Y = (p) => padT + (1 - p) * (H - padT - padB);
+    ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.fillStyle = '#62666d';
+    [0, .25, .5, .75, 1].forEach(p => { ctx.beginPath(); ctx.moveTo(padL, Y(p)); ctx.lineTo(W - 6, Y(p)); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(p * 100 + '%', padL - 6, Y(p) + 4); });
+    [0, 50, 100].forEach(x => { ctx.textAlign = x === 100 ? 'right' : x ? 'center' : 'left'; ctx.fillText(x + '%', X(x), H - 6); });
+    const pts = probHist.filter(h => h.pst > 0);
+    if (!pts.length) return;
+    // acima de 50% na cor de A, abaixo na cor de B
+    [[ca, 0, Y(.5)], [cb, Y(.5), H]].forEach(([col, y0, y1]) => {
+      ctx.save(); ctx.beginPath(); ctx.rect(0, y0, W, y1 - y0); ctx.clip();
+      ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.beginPath();
+      pts.forEach((h, i) => i ? ctx.lineTo(X(h.pst), Y(h.p)) : ctx.moveTo(X(h.pst), Y(h.p))); ctx.stroke(); ctx.restore();
+    });
+    const lp = pts[pts.length - 1];
+    ctx.fillStyle = lp.p >= .5 ? ca : cb; ctx.beginPath(); ctx.arc(X(lp.pst), Y(lp.p), 4, 0, Math.PI * 2); ctx.fill();
+  }
+  window.addEventListener('resize', () => { drawHisto(); drawProbLine(); });
+
   // ---------- voz ----------
   function narrate(s, prev) {
     if (!voice || !('speechSynthesis' in window) || s.cand.length < 2) return;
@@ -900,19 +1187,23 @@
     return m ? Date.UTC(+m[3], m[2] - 1, +m[1], +m[4] + 3, +m[5], +m[6]) : 0;
   }
   const ago = (ms) => { const x = Math.max(0, Math.round(ms / 1000)); return x < 60 ? x + 's' : Math.floor(x / 60) + 'min ' + (x % 60) + 's'; };
-  let lastCheck = 0, tickTimer = 0, ticking = false, fails = 0;
+  let lastCheck = 0, tickTimer = 0, ticking = false, tickStart = 0, fails = 0, checks = 0;
 
   async function tick() {
     if (ticking) return;
-    ticking = true; clearTimeout(tickTimer);
+    ticking = true; tickStart = Date.now(); clearTimeout(tickTimer);
     try {
       if (!election) {
         election = await discover();
         history = store.get(histKey(), []);
+        probHist = store.get(probKey(), []);
         $('src').textContent = fileUrl('br');
       }
       const s = parse(await getJSON(fileUrl('br')));
-      const changed = !last || s.pst !== last.pst || s.cand.some((c, i) => !last.cand[i] || c.votes !== last.cand[i].votes);
+      checks++;
+      // um servidor de cache atrasado pode devolver um arquivo mais velho; nunca volta o placar para trás
+      const older = last && tseTime(s) && tseTime(last) && tseTime(s) < tseTime(last) && s.pst <= last.pst;
+      const changed = !older && (!last || s.pst !== last.pst || s.cand.some((c, i) => !last.cand[i] || c.votes !== last.cand[i].votes));
       if (changed) {
         const prev = last;
         last = s;
@@ -951,6 +1242,8 @@
       }));
       statesBusy = false;
       renderStates();
+      await loadFirstRound();
+      renderProb();
     }
     setTimeout(tickStates, Math.max(8, cfg.interval * 3) * 1000);
   }
@@ -963,9 +1256,20 @@
     if (last) {
       const pub = tseTime(last);
       $('upd').textContent = (pub ? `TSE publicou às ${last.when.split(' ')[1]} (há ${ago(Date.now() - pub)})` : 'Atualizado pelo TSE: ' + (last.when || '—'))
-        + (lastCheck ? (Date.now() - lastCheck < 1000 ? ' · conferido agora' : ` · conferido há ${ago(Date.now() - lastCheck)}`) : '');
+        + (lastCheck ? (Date.now() - lastCheck < 1000 ? ' · conferido agora' : ` · conferido há ${ago(Date.now() - lastCheck)}`) : '')
+        + (DEMO ? '' : proxyMode ? ' · via intermediário' : ' · direto do TSE');
     }
   }, 250);
+
+  // vigia: se o ciclo de busca travar ou o navegador pausar o timer, religa sozinho
+  setInterval(() => {
+    if (ticking && Date.now() - tickStart > 15000) ticking = false;
+    if (!ticking && nextAt && Date.now() > nextAt + 2000) tick();
+  }, 1000);
+  ['online', 'focus', 'pageshow'].forEach(ev => window.addEventListener(ev, () => tick()));
+  $('live').style.cursor = 'pointer';
+  $('live').title = 'Buscar agora';
+  $('live').onclick = () => tick();
 
   // ---------- controles ----------
   $('btnVoice').onclick = () => {
@@ -1009,7 +1313,7 @@
   };
   $('cfg').addEventListener('close', () => {
     const v = $('cfg').returnValue;
-    if (v === 'reset') { history = []; if (election) store.set(histKey(), []); drawChart(); return; }
+    if (v === 'reset') { history = []; probHist = []; if (election) { store.set(histKey(), []); store.set(probKey(), []); } drawChart(); drawProbLine(); return; }
     if (v !== 'ok') return;
     const favBtn = $('favChips').querySelector('[aria-pressed="true"]');
     const changedSrc = $('ciclo').value.trim() !== cfg.ciclo || $('eleicao').value.trim() !== cfg.eleicao;
@@ -1023,23 +1327,38 @@
 
   // ---------- simulação (?demo=1) ----------
   let demoPst = 0;
-  const demoLean = {};
+  // eleitorado aproximado (milhões) e inclinação de cada estado, só para a simulação
+  const DEMO_E = { sp: 34.4, mg: 16.3, rj: 12.8, ba: 11.3, rs: 8.6, pr: 8.5, pe: 7, ce: 6.8, pa: 6.1, sc: 5.5, ma: 5, go: 4.9, pb: 3, es: 2.9,
+    am: 2.6, pi: 2.6, rn: 2.5, mt: 2.5, al: 2.3, df: 2.2, ms: 2, se: 1.7, ro: 1.2, to: 1.1, ac: .6, ap: .55, rr: .37, zz: .7 };
+  const DEMO_LEAN = { sp: .45, mg: .5, rj: .44, ba: .7, rs: .42, pr: .37, pe: .66, ce: .69, pa: .54, sc: .32, ma: .7, go: .4, pb: .65, es: .41,
+    am: .5, pi: .76, rn: .64, mt: .35, al: .58, df: .41, ms: .39, se: .67, ro: .3, to: .51, ac: .3, ap: .49, rr: .24, zz: .52 };
+  const demoSpeed = {};
+  function demoState(uf, cd) {
+    const first = cd === '6257';
+    const pst = first ? 100 : Math.min(100, demoPst * (demoSpeed[uf] ??= .7 + Math.random() * .6));
+    // as urnas que chegam por último puxam um pouco para A, para a simulação ter "virada"
+    const share = first ? DEMO_LEAN[uf] - .015 : DEMO_LEAN[uf] - .05 * (1 - pst / 100);
+    const valid = DEMO_E[uf] * 1e6 * .79 * .95 * pst / 100;
+    const va = Math.round(valid * share);
+    return { pst, va, vb: Math.round(valid) - va, e: DEMO_E[uf] * 1e6 };
+  }
   function demoFetch(url) {
     if (url.includes('ele-c.json')) return { c: 'ele2026', pl: [{ e: [{ cd: '6258', t: '2', nm: 'Eleição Geral Federal (simulação)' }] }] };
-    const uf = url.match(/dados\/(\w+)\//)[1];
-    if (uf === 'br') demoPst = Math.min(100, demoPst + 2 + Math.random() * 4);
-    const p = demoPst / 100;
-    // um começa na frente e o outro vira perto dos 70%, para testar a virada
-    const shareA = uf === 'br' ? 0.455 + 0.07 * p * p : (demoLean[uf] ??= 0.3 + Math.random() * 0.4);
-    const valid = Math.round((uf === 'br' ? 118e6 : 4e6) * p);
-    const va = Math.round(valid * shareA), vb = valid - va;
-    const done = p >= 1;
+    const [, cd, uf] = url.match(/\/(\d+)\/dados\/(\w+)\//);
+    if (uf === 'br' && cd !== '6257') demoPst = Math.min(100, demoPst + 1 + Math.random() * 2);
+    let r;
+    if (uf === 'br') {
+      r = { va: 0, vb: 0, e: 0, pst: 0 };
+      for (const u in DEMO_E) { const x = demoState(u, cd); r.va += x.va; r.vb += x.vb; r.e += x.e; r.pst += x.pst * DEMO_E[u]; }
+      r.pst /= Object.values(DEMO_E).reduce((a, b) => a + b);
+    } else r = demoState(uf, cd);
+    const { va, vb, pst } = r, valid = va + vb, done = pst >= 100;
     const pc = (x) => (valid ? x / valid * 100 : 0).toFixed(2).replace('.', ',');
     return {
       dg: new Date().toLocaleDateString('pt-BR'), hg: new Date().toLocaleTimeString('pt-BR'),
-      s: { ts: '472075', st: String(Math.round(472075 * p)), pst: demoPst.toFixed(2).replace('.', ',') },
-      e: { te: '156454011', a: String(Math.round(32e6 * p)), pa: '20,59', pc: '79,41' },
-      v: { vb: String(Math.round(1.7e6 * p)), tvn: String(Math.round(3.9e6 * p)) },
+      s: { pst: pst.toFixed(2).replace('.', ',') },
+      e: { te: String(Math.round(r.e)), a: String(Math.round(r.e * .21 * pst / 100)), pa: '21,00', pc: '79,00' },
+      v: { vb: String(Math.round(valid * .015)), tvn: String(Math.round(valid * .035)) },
       carg: [{ cd: '1', agr: [
         { par: [{ cand: [{ n: '13', nmu: 'CANDIDATO A', vap: String(va), pvap: pc(va), st: done ? (va > vb ? 'Eleito' : 'Não eleito') : '' }] }] },
         { par: [{ cand: [{ n: '22', nmu: 'CANDIDATO B', vap: String(vb), pvap: pc(vb), st: done ? (vb > va ? 'Eleito' : 'Não eleito') : '' }] }] },
