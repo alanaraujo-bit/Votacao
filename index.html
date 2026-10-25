@@ -223,6 +223,7 @@
     <div class="chips" id="favChips"></div>
     <label for="interval">Atualizar a cada</label>
     <select id="interval">
+      <option value="5">5 segundos</option>
       <option value="10">10 segundos</option>
       <option value="15">15 segundos</option>
       <option value="30">30 segundos</option>
@@ -293,7 +294,8 @@
   const FALLBACK = ['#e11d48', '#16a34a'];
 
   // ---------- estado ----------
-  let cfg = Object.assign({ interval: 15, ciclo: '', eleicao: '', fav: '' }, store.get('cfg', {}));
+  let cfg = Object.assign({ interval: 5, ciclo: '', eleicao: '', fav: '' }, store.get('cfg', {}));
+  if (!store.get('v2')) { cfg.interval = 5; store.set('v2', 1); } // 15s era o padrão antigo
   if (params.get('ciclo')) cfg.ciclo = params.get('ciclo');
   if (params.get('eleicao')) cfg.eleicao = params.get('eleicao');
   let election = null;          // { ciclo, cd }
@@ -455,7 +457,6 @@
 
     $('pst').textContent = fmt2.format(s.pst) + '%';
     $('pstBar').style.width = s.pst + '%';
-    $('upd').textContent = s.when ? 'Atualizado pelo TSE: ' + s.when : '—';
 
     // delta desde a última atualização (em relação a quem lidera agora)
     if (prev && prev.cand.length === 2) {
@@ -593,7 +594,17 @@
 
   const histKey = () => 'hist:' + (DEMO ? 'demo' : election.ciclo + ':' + election.cd);
 
+  // hora de publicação do TSE ("25/10/2026" + "19:40:00", horário de Brasília) em milissegundos
+  function tseTime(s) {
+    const m = /(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/.exec(s.when || '');
+    return m ? Date.UTC(+m[3], m[2] - 1, +m[1], +m[4] + 3, +m[5], +m[6]) : 0;
+  }
+  const ago = (ms) => { const x = Math.max(0, Math.round(ms / 1000)); return x < 60 ? x + 's' : Math.floor(x / 60) + 'min ' + (x % 60) + 's'; };
+  let lastCheck = 0, tickTimer = 0, ticking = false;
+
   async function tick() {
+    if (ticking) return;
+    ticking = true; clearTimeout(tickTimer);
     try {
       if (!election) {
         election = await discover();
@@ -614,14 +625,16 @@
         }
         drawChart();
       }
+      lastCheck = Date.now();
       setLive(s.pst < 100 || DEMO, DEMO ? 'SIMULAÇÃO' : s.pst >= 100 ? 'FINAL' : 'AO VIVO');
       showErr('');
     } catch (e) {
       setLive(false, 'SEM CONEXÃO');
       showErr('Não consegui buscar os dados do TSE (' + (e.message || e) + '). Tentando de novo sozinho… Se usar o Brave, desligue o escudo (ícone do leão) para este site.');
     }
+    ticking = false;
     nextAt = Date.now() + cfg.interval * 1000;
-    setTimeout(tick, cfg.interval * 1000);
+    tickTimer = setTimeout(tick, cfg.interval * 1000);
   }
 
   let statesBusy = false;
@@ -634,13 +647,18 @@
       statesBusy = false;
       renderStates();
     }
-    setTimeout(tickStates, Math.max(30, cfg.interval * 3) * 1000);
+    setTimeout(tickStates, Math.max(20, cfg.interval * 3) * 1000);
   }
 
   setInterval(() => {
     const left = Math.max(0, nextAt - Date.now());
     $('cdTxt').textContent = nextAt ? Math.ceil(left / 1000) + 's' : '—';
     $('cdRing').style.strokeDashoffset = 94.25 * (1 - left / (cfg.interval * 1000));
+    if (last) {
+      const pub = tseTime(last);
+      $('upd').textContent = (pub ? `TSE publicou às ${last.when.split(' ')[1]} (há ${ago(Date.now() - pub)})` : 'Atualizado pelo TSE: ' + (last.when || '—'))
+        + (lastCheck ? ` · conferido há ${ago(Date.now() - lastCheck)}` : '');
+    }
   }, 250);
 
   // ---------- controles ----------
@@ -659,6 +677,8 @@
     drawChart();
   };
   document.addEventListener('visibilitychange', async () => {
+    // o celular congela a aba em segundo plano; ao voltar, busca na hora em vez de esperar o próximo ciclo
+    if (document.visibilityState === 'visible') tick();
     if (document.visibilityState === 'visible' && document.body.classList.contains('tv')) {
       try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
     }
