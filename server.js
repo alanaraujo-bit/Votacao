@@ -22,6 +22,10 @@ const first = {};                     // uf -> versão enxuta do 1º turno
 const meta = {};                      // uf -> { etag, lastModified, key }
 const status = { ok: false, lastOk: 0, lastErr: '', checks: 0, startedAt: Date.now() };
 const clients = new Set();
+// audiência: cada navegador manda um código aleatório (sem nenhum dado pessoal); várias abas contam como uma pessoa
+const watching = new Map();           // código -> conexões abertas
+const seen = new Set();               // códigos que já passaram desde que o servidor ligou
+let peak = 0, peakAt = 0;
 
 // ---------- TSE ----------
 function decode(text) {
@@ -125,7 +129,8 @@ function setStatus(ok, err) {
   else status.lastErr = String(err && err.message || err);
 }
 // "ok" = conseguiu falar com o TSE nos últimos 5s; se não, as páginas passam a buscar direto no TSE
-const publicStatus = () => ({ ok: Date.now() - status.lastOk < 5000, lastOk: status.lastOk, now: Date.now() });
+const publicStatus = () => ({ ok: Date.now() - status.lastOk < 5000, lastOk: status.lastOk, now: Date.now(),
+  viewers: watching.size, total: seen.size, peak, peakAt, since: status.startedAt });
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -185,9 +190,18 @@ function stream(req, res) {
     'access-control-allow-origin': '*',
   });
   res.write('retry: 2000\n\n');
+  const raw = new URL(req.url, 'http://x').searchParams.get('v') || '';
+  const vid = /^[a-z0-9]{8,40}$/i.test(raw) ? raw : 'anon-' + Math.random().toString(36).slice(2);
+  watching.set(vid, (watching.get(vid) || 0) + 1);
+  if (seen.size < 5e6) seen.add(vid);
+  if (watching.size > peak) { peak = watching.size; peakAt = Date.now(); }
   send(res, 'hello', { election, status: publicStatus(), files, first: Object.keys(first).length >= 20 ? first : null });
   clients.add(res);
-  req.on('close', () => clients.delete(res));
+  req.on('close', () => {
+    clients.delete(res);
+    const n = (watching.get(vid) || 1) - 1;
+    if (n > 0) watching.set(vid, n); else watching.delete(vid);
+  });
 }
 
 // ---------- arquivos estáticos ----------

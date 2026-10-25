@@ -70,6 +70,14 @@
   .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--down); box-shadow: 0 0 0 0 rgba(242,85,90,.6); animation: pulse 1.6s infinite; }
   .live.off i { background: var(--faint); animation: none; }
   @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(242,85,90,.55)} 70%{box-shadow:0 0 0 7px rgba(242,85,90,0)} 100%{box-shadow:0 0 0 0 rgba(242,85,90,0)} }
+  .viewers { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-2); white-space: nowrap;
+             padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
+  .viewers[hidden] { display: none; }
+  .viewers b { font-weight: 600; color: var(--text); transition: color .3s; }
+  .viewers.bump b { color: var(--up); }
+  .audience { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+  .audience[hidden] { display: none; }
+  @media (max-width: 560px) { .audience { grid-template-columns: 1fr 1fr; } .audience .card:first-child { grid-column: 1 / -1; } }
   .countdown { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); min-width: 40px; }
   .countdown svg { width: 16px; height: 16px; transform: rotate(-90deg); }
   .tools { display: flex; gap: 6px; }
@@ -263,7 +271,7 @@
 
   @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 560px) {
-    .brand .crumb, .brand span:nth-child(2), .tool .lbl, #cdTxt { display: none; }
+    .brand .crumb, .brand span:nth-child(2), .tool .lbl, .viewers .lbl, #cdTxt, #cd { display: none; }
     .countdown { min-width: 0; }
     .tool { padding: 0 8px; }
     header { gap: 8px; }
@@ -283,6 +291,9 @@
     <div class="brand"><span class="logo"></span><span>Apuração</span><span class="crumb" id="title">Presidente · 2º turno</span></div>
     <span class="spacer"></span>
     <span class="live off" id="live"><i></i><span id="liveTxt">Conectando</span></span>
+    <span class="viewers" id="viewers" hidden title="Pessoas com a página aberta agora">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      <b id="viewersN">0</b><span class="lbl">assistindo</span></span>
     <span class="countdown hide-tv" id="cd" title="Próxima checagem">
       <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="5"/>
         <circle id="cdRing" cx="18" cy="18" r="15" fill="none" stroke="#8b93ff" stroke-width="5" stroke-dasharray="94.25" stroke-dashoffset="0" stroke-linecap="round"/></svg>
@@ -424,6 +435,12 @@
       </div>
     </div>
     <div class="states" id="states"></div>
+  </div>
+
+  <div class="audience hide-tv" id="audience" hidden>
+    <div class="card"><h3>Assistindo agora</h3><div class="big" id="audNow">—</div><div class="sub">Pessoas com a página aberta neste momento</div></div>
+    <div class="card"><h3>Pico ao mesmo tempo</h3><div class="big" id="audPeak">—</div><div class="sub" id="audPeakAt">—</div></div>
+    <div class="card"><h3>Visitantes no total</h3><div class="big" id="audTotal">—</div><div class="sub" id="audSince">—</div></div>
   </div>
 
   <footer class="hide-tv">
@@ -1279,7 +1296,22 @@
   // Se a transmissão cair, ou o servidor não conseguir falar com o TSE, a página volta a buscar direto no TSE sozinha.
   let es = null, pushOk = false, pushSeen = 0, pushLastOk = 0, statesTimer = 0;
   const pushActive = () => pushOk && !!election && Date.now() - pushSeen < 5000 && Date.now() - pushLastOk < 6000;
+  let lastViewers = -1;
+  function showAudience(st) {
+    if (st.viewers == null) return;
+    $('viewers').hidden = false; $('audience').hidden = false;
+    $('viewersN').textContent = fmt.format(st.viewers);
+    if (lastViewers >= 0 && st.viewers > lastViewers) { $('viewers').classList.remove('bump'); void $('viewers').offsetWidth; $('viewers').classList.add('bump'); setTimeout(() => $('viewers').classList.remove('bump'), 900); }
+    lastViewers = st.viewers;
+    const hm = (t) => new Date(Date.now() - (st.now - t)).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    $('audNow').textContent = fmt.format(st.viewers);
+    $('audPeak').textContent = fmt.format(st.peak || 0);
+    $('audPeakAt').textContent = st.peakAt ? 'às ' + hm(st.peakAt) : '—';
+    $('audTotal').textContent = fmt.format(st.total || 0);
+    $('audSince').textContent = st.since ? 'Pessoas diferentes desde as ' + hm(st.since) : '—';
+  }
   function onStatus(st) {
+    showAudience(st);
     pushSeen = Date.now();
     pushOk = !!st.ok;
     if (st.ok && st.lastOk && st.now) pushLastOk = Date.now() - (st.now - st.lastOk);
@@ -1300,7 +1332,9 @@
   function startPush() {
     if (DEMO || !/^https?:$/.test(location.protocol) || !window.EventSource) return;
     let opened = false;
-    es = new EventSource('api/stream');
+    let vid = '';
+    try { vid = localStorage.getItem('apuracao:vid') || ''; if (!vid) { vid = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('apuracao:vid', vid); } } catch {}
+    es = new EventSource('api/stream' + (vid ? '?v=' + vid : ''));
     es.onopen = () => { opened = true; };
     es.addEventListener('hello', (e) => {
       const d = JSON.parse(e.data);
