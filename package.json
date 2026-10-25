@@ -1,0 +1,13 @@
+{
+  "name": "apuracao-ao-vivo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Apuração do 2º turno ao vivo, com transmissão instantânea a partir dos dados oficiais do TSE",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

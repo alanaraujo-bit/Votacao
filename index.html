@@ -959,7 +959,7 @@
 
   // ---------- probabilidade (Monte Carlo) ----------
   const SIMS = 20000;
-  let firstRound = null, firstTried = false, probHist = [], lastModel = null;
+  let firstRound = null, firstRaw = null, firstTried = false, probHist = [], lastModel = null;
   const probKey = () => 'prob:' + (DEMO ? 'demo' : election.ciclo + ':' + election.cd);
 
   // gerador com semente fixa: mesmos dados de entrada dão o mesmo resultado (o número não "treme" à toa)
@@ -977,12 +977,13 @@
   // 1º turno, por estado, como referência para onde ainda há pouco voto contado
   async function loadFirstRound() {
     if (firstTried || !election || !last || last.cand.length < 2) return;
+    if (pushActive() && !firstRaw) return; // o servidor manda o 1º turno quando tiver; não busca no TSE à toa
     firstTried = true;
     const cd1 = String(num(election.cd) - 1);
     const [A, B] = last.cand, out = {};
     await Promise.all(['br', ...UFS].map(async uf => {
       try {
-        const j = parse(await getJSON(fileUrlFor(cd1, uf)));
+        const j = parse(firstRaw && firstRaw[uf] ? firstRaw[uf] : await getJSON(fileUrlFor(cd1, uf)));
         const a = j.all.find(c => c.n === A.n), b = j.all.find(c => c.n === B.n);
         if (a && b && a.votes + b.votes > 0) out[uf] = a.votes / (a.votes + b.votes);
       } catch {}
@@ -1189,17 +1190,15 @@
   const ago = (ms) => { const x = Math.max(0, Math.round(ms / 1000)); return x < 60 ? x + 's' : Math.floor(x / 60) + 'min ' + (x % 60) + 's'; };
   let lastCheck = 0, tickTimer = 0, ticking = false, tickStart = 0, fails = 0, checks = 0;
 
-  async function tick() {
-    if (ticking) return;
-    ticking = true; tickStart = Date.now(); clearTimeout(tickTimer);
-    try {
-      if (!election) {
-        election = await discover();
-        history = store.get(histKey(), []);
-        probHist = store.get(probKey(), []);
-        $('src').textContent = fileUrl('br');
-      }
-      const s = parse(await getJSON(fileUrl('br')));
+  function setElection(e) {
+    election = e;
+    history = store.get(histKey(), []);
+    probHist = store.get(probKey(), []);
+    $('src').textContent = fileUrl('br');
+  }
+
+  // aplica um novo arquivo nacional, venha ele da busca direta ou da transmissão do servidor
+  function applyNational(s) {
       checks++;
       // um servidor de cache atrasado pode devolver um arquivo mais velho; nunca volta o placar para trás
       const older = last && tseTime(s) && tseTime(last) && tseTime(s) < tseTime(last) && s.pst <= last.pst;
@@ -1221,6 +1220,19 @@
       setLive(s.pst < 100 || DEMO, DEMO ? 'Simulação' : s.pst >= 100 ? 'Final' : 'Ao vivo');
       showErr('');
       fails = 0;
+  }
+
+  async function tick() {
+    if (ticking) return;
+    ticking = true; tickStart = Date.now(); clearTimeout(tickTimer);
+    // com a transmissão do servidor ativa, os números chegam sozinhos; não precisa buscar no TSE
+    if (pushActive()) {
+      ticking = false; nextAt = Date.now() + 1000; tickTimer = setTimeout(tick, 1000);
+      return;
+    }
+    try {
+      if (!election) setElection(await discover());
+      applyNational(parse(await getJSON(fileUrl('br'))));
     } catch (e) {
       fails++;
       setLive(false, 'Sem conexão');
@@ -1235,7 +1247,7 @@
 
   let statesBusy = false;
   async function tickStates() {
-    if (election && !statesBusy) {
+    if (election && !statesBusy && !pushActive()) {
       statesBusy = true;
       await Promise.all(UFS.map(async uf => {
         try { states[uf] = parse(await getJSON(fileUrl(uf))); } catch {}
@@ -1255,11 +1267,59 @@
     $('cdRing').style.strokeDashoffset = instant ? 0 : 94.25 * (1 - left / Math.max(1000, cfg.interval * 1000));
     if (last) {
       const pub = tseTime(last);
+      if (pushActive()) lastCheck = Math.max(lastCheck, pushLastOk);
       $('upd').textContent = (pub ? `TSE publicou às ${last.when.split(' ')[1]} (há ${ago(Date.now() - pub)})` : 'Atualizado pelo TSE: ' + (last.when || '—'))
         + (lastCheck ? (Date.now() - lastCheck < 1000 ? ' · conferido agora' : ` · conferido há ${ago(Date.now() - lastCheck)}`) : '')
-        + (DEMO ? '' : proxyMode ? ' · via intermediário' : ' · direto do TSE');
+        + (DEMO ? '' : pushActive() ? ' · transmissão ao vivo' : proxyMode ? ' · via intermediário' : ' · direto do TSE');
     }
   }, 250);
+
+  // ---------- transmissão ao vivo do servidor (server.js) ----------
+  // Quando a página é aberta pelo servidor, ele busca no TSE e empurra cada mudança na hora (Server-Sent Events).
+  // Se a transmissão cair, ou o servidor não conseguir falar com o TSE, a página volta a buscar direto no TSE sozinha.
+  let es = null, pushOk = false, pushSeen = 0, pushLastOk = 0, statesTimer = 0;
+  const pushActive = () => pushOk && !!election && Date.now() - pushSeen < 5000 && Date.now() - pushLastOk < 6000;
+  function onStatus(st) {
+    pushSeen = Date.now();
+    pushOk = !!st.ok;
+    if (st.ok && st.lastOk && st.now) pushLastOk = Date.now() - (st.now - st.lastOk);
+    if (pushActive() && last) {
+      fails = 0; showErr('');
+      setLive(last.pst < 100, last.pst >= 100 ? 'Final' : 'Ao vivo');
+    }
+  }
+  function scheduleStates() {
+    if (statesTimer) return;
+    statesTimer = setTimeout(async () => { statesTimer = 0; renderStates(); await loadFirstRound(); renderProb(); }, 800);
+  }
+  function applyFile(uf, raw) {
+    pushSeen = Date.now(); pushLastOk = Date.now();
+    if (uf === 'br') applyNational(parse(raw));
+    else { states[uf] = parse(raw); scheduleStates(); }
+  }
+  function startPush() {
+    if (DEMO || !/^https?:$/.test(location.protocol) || !window.EventSource) return;
+    let opened = false;
+    es = new EventSource('api/stream');
+    es.onopen = () => { opened = true; };
+    es.addEventListener('hello', (e) => {
+      const d = JSON.parse(e.data);
+      if (d.election && (!election || election.cd !== d.election.cd || election.ciclo !== d.election.ciclo)) setElection(d.election);
+      if (d.first) firstRaw = d.first;
+      onStatus(d.status || {});
+      if (d.files.br) applyFile('br', d.files.br);
+      for (const uf in d.files) if (uf !== 'br') applyFile(uf, d.files[uf]);
+    });
+    es.addEventListener('file', (e) => { const d = JSON.parse(e.data); applyFile(d.uf, d.data); });
+    es.addEventListener('status', (e) => onStatus(JSON.parse(e.data)));
+    es.addEventListener('first', (e) => { firstRaw = JSON.parse(e.data); firstTried = false; scheduleStates(); });
+    es.onerror = () => {
+      pushOk = false;
+      // sem servidor (ex.: página aberta como arquivo ou em outro site): desiste e tenta de novo daqui a 30s
+      if (!opened) { es.close(); es = null; setTimeout(startPush, 30000); }
+    };
+  }
+  startPush();
 
   // vigia: se o ciclo de busca travar ou o navegador pausar o timer, religa sozinho
   setInterval(() => {
@@ -1367,8 +1427,15 @@
   }
   if (DEMO) { cfg.interval = Math.max(cfg.interval, 2); store.set = () => {}; }
 
-  tick();
-  setTimeout(tickStates, 1500);
+  // espera um instante pela transmissão do servidor antes de buscar direto no TSE
+  // (com muita gente abrindo a página ao mesmo tempo, isso poupa o TSE de milhares de buscas)
+  let booted = false;
+  const boot = () => { if (booted) return; booted = true; tick(); setTimeout(tickStates, 1500); };
+  if (es) {
+    es.addEventListener('hello', () => setTimeout(boot, 0));
+    es.addEventListener('error', () => boot());
+    setTimeout(boot, 3000);
+  } else boot();
 })();
 </script>
 </body>
