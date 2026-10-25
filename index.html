@@ -231,7 +231,7 @@
     <label for="ciclo">Ciclo (avançado, deixe em branco para detectar sozinho)</label>
     <input id="ciclo" placeholder="ex.: ele2026">
     <label for="eleicao">Código da eleição do 2º turno (avançado)</label>
-    <input id="eleicao" placeholder="ex.: 545 (foi o de 2022)">
+    <input id="eleicao" placeholder="padrão: 6258">
     <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px">
       <button class="tool" value="reset" id="cfgReset">Limpar histórico</button>
       <button class="tool" value="ok" style="border-color:var(--gold); color:var(--gold)">Salvar</button>
@@ -309,65 +309,97 @@
   // ---------- rede ----------
   const PROXIES = [
     (u) => u,
-    (u) => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
-    (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    (u) => 'https://corsproxy.io/?url=' + encodeURIComponent(u + '?u=' + Date.now()),
+    (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u + '?u=' + Date.now()),
+    (u) => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
   ];
+
+  // Em 2026 os arquivos podem vir como JSON puro ou assinados (JWS: cabeçalho.payload.assinatura).
+  function decode(text) {
+    const t = text.trim();
+    if (t[0] === '{' || t[0] === '[') return JSON.parse(t);
+    const parts = t.replace(/^"|"$/g, '').split('.');
+    if (parts.length === 3) {
+      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+      return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+    }
+    throw new Error('resposta inesperada');
+  }
 
   async function getJSON(url) {
     if (DEMO) return demoFetch(url);
-    const bust = url + (url.includes('?') ? '&' : '?') + 'u=' + Date.now();
     let lastErr;
     for (let i = 0; i < PROXIES.length; i++) {
       const mode = (proxyMode + i) % PROXIES.length;
       try {
-        const r = await fetch(PROXIES[mode](bust), { cache: 'no-store' });
+        const r = await fetch(PROXIES[mode](url), { cache: 'no-store', signal: AbortSignal.timeout(10000) });
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        const j = await r.json();
+        const j = decode(await r.text());
         if (mode !== proxyMode) { proxyMode = mode; store.set('proxy', mode); }
         return j;
-      } catch (e) { lastErr = e; }
+      } catch (e) {
+        lastErr = e;
+        if (/HTTP 404/.test(e.message) && mode === 0) break; // o arquivo não existe; proxy não ajuda
+      }
     }
     throw lastErr;
   }
 
-  // Descobre o ciclo e o código do 2º turno lendo a configuração pública do TSE.
+  // 2º turno de 2026: ciclo ele2026, eleição 6258 (1º turno foi 6257), conforme ele-c.json do TSE.
+  const DEFAULT_ELECTION = { ciclo: 'ele2026', cd: '6258' };
+
   async function discover() {
     if (cfg.ciclo && cfg.eleicao) return { ciclo: cfg.ciclo, cd: String(cfg.eleicao) };
-    const conf = await getJSON(BASE + '/comum/config/ele-c.json');
-    const ciclo = cfg.ciclo || conf.c || 'ele' + new Date().getFullYear();
+    let conf;
+    try { conf = await getJSON(BASE + '/comum/config/ele-c.json'); }
+    catch { return { ciclo: cfg.ciclo || DEFAULT_ELECTION.ciclo, cd: cfg.eleicao || DEFAULT_ELECTION.cd }; }
+    const ciclo = cfg.ciclo || conf.c || DEFAULT_ELECTION.ciclo;
     if (cfg.eleicao) return { ciclo, cd: String(cfg.eleicao) };
     const found = [];
     (function walk(o) {
       if (Array.isArray(o)) return o.forEach(walk);
       if (o && typeof o === 'object') {
+        if (o.cdt2) found.push({ cd: o.cdt2, t: '2', nm: o.nm || '' });
         if (o.cd != null && o.t != null && (o.nm || o.dt)) found.push(o);
         Object.values(o).forEach(walk);
       }
     })(conf);
     // 2º turno, de preferência a eleição geral federal (não a municipal/estadual)
     const t2 = found.filter(e => String(e.t) === '2');
-    const fed = t2.filter(e => /federal|geral/i.test(e.nm || '')) ;
+    const fed = t2.filter(e => /federal|geral/i.test(e.nm || ''));
     const pick = (fed.length ? fed : t2).sort((a, b) => num(b.cd) - num(a.cd))[0];
-    if (!pick) throw new Error('Não encontrei o 2º turno na configuração do TSE. Informe o código nas configurações (⚙️).');
-    return { ciclo, cd: String(pick.cd) };
+    return { ciclo, cd: pick ? String(pick.cd) : DEFAULT_ELECTION.cd };
   }
 
   const fileUrl = (uf) => {
     const e = election.cd.padStart(6, '0');
-    return `${BASE}/${election.ciclo}/${election.cd}/dados-simplificados/${uf}/${uf}-c0001-e${e}-r.json`;
+    return `${BASE}/${election.ciclo}/${election.cd}/dados/${uf}/${uf}-c0001-e${e}-u.json`;
   };
 
+  // Aceita o formato de 2026 (carg → agr → par → cand, com blocos s/e/v) e o antigo de 2022 (cand na raiz).
   function parse(j) {
-    const cand = (j.cand || []).map((c, i) => ({
-      n: String(c.n), nm: firstName(c.nm), votes: num(c.vap), pct: num(c.pvap),
-      elected: c.e === 's' || /eleito/i.test(c.st || '') && !/não/i.test(c.st || ''),
-    })).sort((a, b) => num(a.n) - num(b.n)).slice(0, 2);
+    let raw = j.cand || [];
+    if (j.carg) {
+      raw = [];
+      const car = j.carg.find(c => String(c.cd) === '1') || j.carg[0];
+      (car.agr || []).forEach(a => (a.par || []).forEach(p => (p.cand || []).forEach(c => raw.push(c))));
+      (car.cand || []).forEach(c => raw.push(c));
+    }
+    const cand = raw.map(c => ({
+      n: String(c.n), nm: firstName(c.nmu || c.nm), votes: num(c.vap), pct: num(c.pvap),
+      elected: /^eleit/i.test(c.st || '') || (!j.carg && c.e === 's'),
+    })).sort((a, b) => b.votes - a.votes || num(a.n) - num(b.n)).slice(0, 2)
+      .sort((a, b) => num(a.n) - num(b.n));
+    const sec = j.s && typeof j.s === 'object' ? j.s : j;
+    const el = j.e && typeof j.e === 'object' ? j.e : { te: j.e, a: j.a, pa: j.pa, pc: j.pc };
+    const vt = j.v && typeof j.v === 'object' ? j.v : j;
     return {
-      pst: num(j.pst),
+      pst: num(sec.pst),
       when: [j.dg, j.hg].filter(Boolean).join(' '),
       cand,
-      e: num(j.e), tv: num(j.tv), vb: num(j.vb), vn: num(j.tvn != null ? j.tvn : j.vn), a: num(j.a), pc: num(j.pc), pa: num(j.pa),
-      matDef: j.md === 's' || j.matematicamente_definido === 's',
+      e: num(el.te), a: num(el.a), pa: num(el.pa), pc: num(el.pc),
+      vb: num(vt.vb), vn: num(vt.tvn != null ? vt.tvn : vt.vn),
     };
   }
 
@@ -586,7 +618,7 @@
       showErr('');
     } catch (e) {
       setLive(false, 'SEM CONEXÃO');
-      showErr('Não consegui buscar os dados do TSE (' + (e.message || e) + '). Tentando de novo sozinho…');
+      showErr('Não consegui buscar os dados do TSE (' + (e.message || e) + '). Tentando de novo sozinho… Se usar o Brave, desligue o escudo (ícone do leão) para este site.');
     }
     nextAt = Date.now() + cfg.interval * 1000;
     setTimeout(tick, cfg.interval * 1000);
@@ -667,8 +699,8 @@
   let demoPst = 0;
   const demoLean = {};
   function demoFetch(url) {
-    if (url.includes('ele-c.json')) return { c: 'ele2026', pl: [{ e: [{ cd: '999', t: '2', nm: 'Eleição Geral Federal (simulação)' }] }] };
-    const uf = url.match(/dados-simplificados\/(\w+)\//)[1];
+    if (url.includes('ele-c.json')) return { c: 'ele2026', pl: [{ e: [{ cd: '6258', t: '2', nm: 'Eleição Geral Federal (simulação)' }] }] };
+    const uf = url.match(/dados\/(\w+)\//)[1];
     if (uf === 'br') demoPst = Math.min(100, demoPst + 2 + Math.random() * 4);
     const p = demoPst / 100;
     // um começa na frente e o outro vira perto dos 70%, para testar a virada
@@ -676,13 +708,16 @@
     const valid = Math.round((uf === 'br' ? 118e6 : 4e6) * p);
     const va = Math.round(valid * shareA), vb = valid - va;
     const done = p >= 1;
+    const pc = (x) => (valid ? x / valid * 100 : 0).toFixed(2).replace('.', ',');
     return {
-      pst: (demoPst).toFixed(2).replace('.', ','), dg: new Date().toLocaleDateString('pt-BR'), hg: new Date().toLocaleTimeString('pt-BR'),
-      e: '156454011', a: String(Math.round(32e6 * p)), pa: '20,59', pc: '79,41', vb: String(Math.round(1.7e6 * p)), tvn: String(Math.round(3.9e6 * p)),
-      cand: [
-        { n: '13', nm: 'CANDIDATO A', vap: String(va), pvap: (valid ? va / valid * 100 : 0).toFixed(2).replace('.', ','), e: done && va > vb ? 's' : 'n' },
-        { n: '22', nm: 'CANDIDATO B', vap: String(vb), pvap: (valid ? vb / valid * 100 : 0).toFixed(2).replace('.', ','), e: done && vb > va ? 's' : 'n' },
-      ],
+      dg: new Date().toLocaleDateString('pt-BR'), hg: new Date().toLocaleTimeString('pt-BR'),
+      s: { ts: '472075', st: String(Math.round(472075 * p)), pst: demoPst.toFixed(2).replace('.', ',') },
+      e: { te: '156454011', a: String(Math.round(32e6 * p)), pa: '20,59', pc: '79,41' },
+      v: { vb: String(Math.round(1.7e6 * p)), tvn: String(Math.round(3.9e6 * p)) },
+      carg: [{ cd: '1', agr: [
+        { par: [{ cand: [{ n: '13', nmu: 'CANDIDATO A', vap: String(va), pvap: pc(va), st: done ? (va > vb ? 'Eleito' : 'Não eleito') : '' }] }] },
+        { par: [{ cand: [{ n: '22', nmu: 'CANDIDATO B', vap: String(vb), pvap: pc(vb), st: done ? (vb > va ? 'Eleito' : 'Não eleito') : '' }] }] },
+      ] }],
     };
   }
   if (DEMO) { cfg.interval = Math.min(cfg.interval, 5); store.set = () => {}; }
