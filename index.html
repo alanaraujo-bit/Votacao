@@ -293,6 +293,8 @@
     <div class="chips" id="favChips"></div>
     <label for="interval">Atualizar a cada</label>
     <select id="interval">
+      <option value="1">1 segundo</option>
+      <option value="2">2 segundos</option>
       <option value="5">5 segundos</option>
       <option value="10">10 segundos</option>
       <option value="15">15 segundos</option>
@@ -364,8 +366,8 @@
   const FALLBACK = ['#f2555a', '#4cb782'];
 
   // ---------- estado ----------
-  let cfg = Object.assign({ interval: 5, ciclo: '', eleicao: '', fav: '' }, store.get('cfg', {}));
-  if (!store.get('v2')) { cfg.interval = 5; store.set('v2', 1); } // 15s era o padrão antigo
+  let cfg = Object.assign({ interval: 1, ciclo: '', eleicao: '', fav: '' }, store.get('cfg', {}));
+  if (!store.get('v3')) { cfg.interval = 1; store.set('v3', 1); } // 15s e 5s foram padrões antigos
   if (params.get('ciclo')) cfg.ciclo = params.get('ciclo');
   if (params.get('eleicao')) cfg.eleicao = params.get('eleicao');
   let election = null;          // { ciclo, cd }
@@ -810,7 +812,7 @@
       ] }],
     };
   }
-  if (DEMO) { cfg.interval = Math.min(cfg.interval, 5); store.set = () => {}; }
+  if (DEMO) { cfg.interval = Math.max(cfg.interval, 2); store.set = () => {}; }
 
   tick();
   setTimeout(tickStates, 1500);
