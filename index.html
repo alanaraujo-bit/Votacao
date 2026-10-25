@@ -266,11 +266,14 @@
   /* torcida ao vivo */
   body.has-dock { padding-bottom: 120px; }
   .fx { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
-  .fly { position: absolute; bottom: 90px; font-size: 30px; line-height: 1; will-change: transform, opacity; user-select: none;
-         filter: drop-shadow(0 4px 12px rgba(0,0,0,.45)); }
-  .fly.mine { font-size: 38px; }
+  .fly { position: absolute; bottom: 90px; width: 40px; height: 40px; will-change: transform, opacity; user-select: none;
+         filter: drop-shadow(0 6px 14px rgba(0,0,0,.5)) drop-shadow(0 0 10px color-mix(in srgb, var(--glow) 55%, transparent)); }
+  .fly svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .fly.wide { width: 70px; height: 40px; }
+  .fly.mine { width: 50px; height: 50px; } .fly.mine.wide { width: 86px; height: 48px; }
+  .confetti { position: absolute; top: -12px; width: 8px; height: 13px; border-radius: 2px; will-change: transform, opacity; }
   .dock { position: fixed; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 25;
-          width: min(860px, calc(100% - 24px)); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
+          width: min(1060px, calc(100% - 24px)); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px;
           padding: 10px; border-radius: 18px; border: 1px solid var(--line-2);
           background: rgba(15,16,17,.78); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
           box-shadow: 0 18px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06); }
@@ -278,12 +281,14 @@
   .side-btns { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .side-btns.right { justify-content: flex-end; }
   .side-btns .who-s { display: none; font-size: 12px; font-weight: 600; color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
-  .rx { width: 42px; height: 42px; flex: none; border-radius: 12px; font-size: 22px; line-height: 1; display: grid; place-items: center;
+  .rx { width: 46px; height: 46px; flex: none; border-radius: 12px; padding: 6px; line-height: 1; display: grid; place-items: center;
         background: color-mix(in srgb, var(--c) 12%, rgba(255,255,255,.03)); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
         transition: transform .08s, background .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  .rx svg { width: 100%; height: 100%; display: block; overflow: visible; pointer-events: none; }
+  .rx.wide { width: 74px; padding: 7px 5px; }
   .rx:hover { background: color-mix(in srgb, var(--c) 22%, transparent); }
   .rx:active, .rx.hold { transform: scale(.88); background: color-mix(in srgb, var(--c) 32%, transparent); }
-  .meter { width: 230px; text-align: center; }
+  .meter { width: 210px; text-align: center; }
   .meter .lab { font-size: 11px; color: var(--muted); font-weight: 500; }
   .meter .mbar { height: 8px; display: flex; gap: 2px; margin: 6px 0 5px; border-radius: 999px; overflow: hidden; }
   .meter .mbar > div { transition: width .6s cubic-bezier(.2,.8,.2,1); border-radius: 999px; }
@@ -291,7 +296,8 @@
   .combo { position: fixed; bottom: 96px; z-index: 31; pointer-events: none; font-size: 15px; font-weight: 700; color: #fff;
            padding: 4px 10px; border-radius: 999px; background: var(--c); box-shadow: 0 0 24px var(--c); opacity: 0; transition: opacity .2s; }
   .combo.on { opacity: 1; }
-  .combo.left { left: max(14px, calc(50% - 430px)); } .combo.right { right: max(14px, calc(50% - 430px)); }
+  .combo.left { left: max(14px, calc(50% - 520px)); } .combo.right { right: max(14px, calc(50% - 520px)); }
+  @media (min-width: 721px) and (max-width: 1100px) { .rx[data-id=urna], .rx[data-id=mega] { display: none; } }
   .meter .hot { font-size: 11px; color: var(--text-2); min-height: 14px; margin-top: 3px; }
   @media (max-width: 720px) {
     .dock { grid-template-columns: 1fr; gap: 8px; padding: 8px; }
@@ -304,8 +310,9 @@
     .side-btns .who-s { display: none; }
     .side-btns { justify-content: flex-start; gap: 5px; }
     .side-btns.right { justify-content: flex-end; }
-    .rx { flex: 1 1 0; min-width: 0; width: auto; max-width: 44px; height: 40px; font-size: 19px; }
-    .rx:nth-of-type(n+5) { display: none; }
+    .rx { flex: 1 1 0; min-width: 0; width: auto; max-width: 46px; height: 42px; padding: 5px; }
+    .rx.wide { flex: 1.7 1 0; max-width: 70px; padding: 6px 3px; }
+    .rx[data-id=urna], .rx[data-id=mega] { display: none; }
     body.has-dock { padding-bottom: 130px; }
     .combo { bottom: 118px; }
   }
@@ -1359,19 +1366,117 @@
   // ---------- torcida ao vivo ----------
   // nome curto para caber nos botões: "Flávio Bolsonaro" vira "Bolsonaro"
   const shortNm = (c) => c.nm.length > 12 ? c.nm.split(' ').pop() : c.nm;
-  const RX = ['🔥', '🎉', '👏', '🇧🇷', '💪', '😱'];
+  // Figurinhas próprias da página, desenhadas em SVG, na cor e com o número de cada candidato.
+  // A ordem importa: o servidor só conta o índice (0 a 5).
+  const RX = [
+    { id: 'confirma', nome: 'Confirma' },
+    { id: 'tecla', nome: 'Tecla do número' },
+    { id: 'urna', nome: 'Urna' },
+    { id: 'fogos', nome: 'Fogos' },
+    { id: 'bandeira', nome: 'Bandeira' },
+    { id: 'mega', nome: 'Megafone' },
+  ];
+  function sideInfo(side) {
+    const [A, B] = last.cand, c = side === 'a' ? A : B;
+    return { c, color: colorOf(c, side === 'a' ? 0 : 1) };
+  }
+  // mistura duas cores hex (em atributos SVG, color-mix() não funciona em todo navegador)
+  function mix(a, b, t) {
+    const p = (h) => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
+    const x = p(a), y = p(b);
+    return '#' + x.map((v, k) => Math.round(v + (y[k] - v) * t).toString(16).padStart(2, '0')).join('');
+  }
+  // cada figurinha recebe um id único de gradiente para não conflitar quando há muitas na tela
+  let gid = 0;
+  function sticker(i, side) {
+    const { c, color } = sideInfo(side), g = 'g' + (++gid);
+    const hi = mix(color, '#ffffff', .45), lo = mix(color, '#000000', .3);
+    switch (RX[i].id) {
+      case 'confirma': // a tecla CONFIRMA da urna eletrônica, na cor do candidato
+        return `<svg viewBox="0 0 64 36"><defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset="1" stop-color="${lo}"/></linearGradient></defs>
+          <rect x="1" y="4" width="62" height="31" rx="6" fill="${lo}"/><rect x="1" y="1" width="62" height="30" rx="6" fill="url(#${g})"/>
+          <rect x="4" y="3" width="56" height="7" rx="3.5" fill="#fff" opacity=".22"/>
+          <text x="32" y="21" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10.5" font-weight="800" fill="#fff" letter-spacing=".6">CONFIRMA</text></svg>`;
+      case 'tecla': // tecla preta da urna com o número do candidato
+        return `<svg viewBox="0 0 48 48"><rect x="3" y="6" width="42" height="40" rx="8" fill="#000"/><rect x="3" y="3" width="42" height="40" rx="8" fill="#222327" stroke="${color}" stroke-width="2"/>
+          <rect x="7" y="6" width="34" height="8" rx="4" fill="#fff" opacity=".08"/>
+          <text x="24" y="31" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="19" font-weight="800" fill="#fff">${c.n}</text>
+          <rect x="15" y="36" width="18" height="3" rx="1.5" fill="${color}"/></svg>`;
+      case 'urna': // urna eletrônica com o voto confirmado na tela
+        return `<svg viewBox="0 0 48 48"><path d="M6 14h36l3 28H3z" fill="#d8d6cf"/><path d="M6 14h36l3 28H3z" fill="#000" opacity=".08"/>
+          <rect x="9" y="18" width="17" height="13" rx="2" fill="#0f1011"/><rect x="11" y="20" width="13" height="9" rx="1" fill="${color}"/>
+          <path d="M14 24.5l2.5 2.5 5-5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <g fill="#3a3b40">${[0, 1, 2].map(r => [0, 1, 2].map(k => `<rect x="${30 + k * 4}" y="${18 + r * 4}" width="3" height="3" rx=".6"/>`).join('')).join('')}</g>
+          <rect x="30" y="31" width="11" height="3" rx=".8" fill="#4cb782"/><rect x="5" y="36" width="38" height="3" rx="1" fill="#000" opacity=".15"/>
+          <text x="24" y="10" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="8" font-weight="800" fill="${color}">${c.n}</text></svg>`;
+      case 'fogos': // estouro de fogos na cor do candidato com dourado
+        return `<svg viewBox="0 0 48 48"><g stroke-linecap="round">${Array.from({ length: 12 }, (_, k) => {
+            const a = k / 12 * Math.PI * 2, r1 = 7, r2 = k % 2 ? 17 : 21, col = k % 2 ? '#f7d774' : color;
+            return `<line x1="${24 + Math.cos(a) * r1}" y1="${24 + Math.sin(a) * r1}" x2="${24 + Math.cos(a) * r2}" y2="${24 + Math.sin(a) * r2}" stroke="${col}" stroke-width="2.6"/><circle cx="${24 + Math.cos(a) * (r2 + 3)}" cy="${24 + Math.sin(a) * (r2 + 3)}" r="1.8" fill="${col}"/>`;
+          }).join('')}</g><circle cx="24" cy="24" r="4" fill="#fff"/></svg>`;
+      case 'bandeira': // bandeira do Brasil tremulando, com faixa na cor do candidato
+        return `<svg viewBox="0 0 48 48"><path d="M5 10c8-3 14 3 21 0s13-2 17 0v24c-4-2-10-3-17 0s-13-3-21 0z" fill="#009c3b"/>
+          <path d="M24 13l15 9.5-15 9.5-15-9.5z" fill="#ffdf00"/><circle cx="24" cy="22.5" r="6.2" fill="#002776"/>
+          <path d="M18.2 21.2c4-1.4 8-1 11.7 1.2" stroke="#fff" stroke-width="1.3" fill="none"/>
+          <rect x="3" y="8" width="2.6" height="36" rx="1.3" fill="#cfd3da"/><path d="M5 36c8-3 14 3 21 0s13-2 17 0v4c-4-2-10-3-17 0s-13-3-21 0z" fill="${color}"/></svg>`;
+      case 'mega': // megafone com ondas de som
+        return `<svg viewBox="0 0 48 48"><path d="M6 20h7l18-10v28L13 28H6z" fill="${color}"/><path d="M6 20h7l18-10v4L13 24H6z" fill="#fff" opacity=".2"/>
+          <path d="M11 28l3 11h5l-2-11z" fill="${lo}"/><rect x="4" y="19" width="5" height="10" rx="2" fill="${lo}"/>
+          <g stroke="#f7d774" stroke-width="2.6" fill="none" stroke-linecap="round"><path d="M36 18c2.5 3 2.5 9 0 12"/><path d="M40 14c4.5 5 4.5 15 0 20"/></g></svg>`;
+    }
+    return '';
+  }
+
+  // som da urna (sintetizado aqui mesmo) quando você aperta CONFIRMA
+  let audio = null, beepUntil = 0;
+  function urnaBeep() {
+    if (Date.now() < beepUntil) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = audio.currentTime + .01, notes = [1046, 1318, 1046, 1318, 1046, 1568];
+      notes.forEach((f, k) => {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.type = 'square'; o.frequency.value = f;
+        const t = t0 + k * .085;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.035, t + .005); g.gain.setValueAtTime(.035, t + .06); g.gain.linearRampToValueAtTime(0, t + .075);
+        o.connect(g).connect(audio.destination); o.start(t); o.stop(t + .08);
+      });
+      beepUntil = Date.now() + 700;
+    } catch {}
+  }
+
+  // quando um lado manda muitas reações de uma vez: chuva de confete na metade dele
+  let waveAt = { a: 0, b: 0 };
+  function wave(side) {
+    if (Date.now() - waveAt[side] < 2500) return;
+    waveAt[side] = Date.now();
+    const { color } = sideInfo(side), fx = $('fx'), W = innerWidth, H = innerHeight, left = side === 'a';
+    for (let k = 0; k < 36; k++) {
+      const el = document.createElement('i');
+      el.className = 'confetti';
+      el.style.background = k % 3 ? color : '#f7d774';
+      el.style.left = (left ? W * (.02 + Math.random() * .44) : W * (.54 + Math.random() * .44)) + 'px';
+      fx.appendChild(el);
+      const fall = H * (.5 + Math.random() * .5), dx = (Math.random() - .5) * 160, rot = Math.random() * 720;
+      el.animate([
+        { transform: 'translate(0,0) rotate(0)', opacity: 1 },
+        { transform: `translate(${dx}px,${fall}px) rotate(${rot}deg)`, opacity: 0 },
+      ], { duration: 1800 + Math.random() * 1400, easing: 'cubic-bezier(.25,.6,.4,1)', delay: Math.random() * 300 }).onfinish = () => el.remove();
+    }
+  }
   const MAX_FLY = 140;
   let dockReady = false, myVid = '';
   const queue = { a: new Array(RX.length).fill(0), b: new Array(RX.length).fill(0) };
   const mine = { a: 0, b: 0 };   // minhas reações ainda não "devolvidas" pelo servidor (para não animar duas vezes)
   const comboN = { a: 0, b: 0 }, comboT = { a: 0, b: 0 };
 
-  function fly(side, emoji, isMine) {
+  function fly(side, i, isMine) {
     const fx = $('fx');
-    if (fx.childElementCount >= MAX_FLY) return;
+    if (fx.childElementCount >= MAX_FLY || !last) return;
     const el = document.createElement('span');
-    el.className = 'fly' + (isMine ? ' mine' : '');
-    el.textContent = emoji;
+    el.className = 'fly' + (isMine ? ' mine' : '') + (RX[i].id === 'confirma' ? ' wide' : '');
+    el.style.setProperty('--glow', sideInfo(side).color);
+    el.innerHTML = sticker(i, side);
     const W = innerWidth, left = side === 'a';
     const x = left ? W * (.02 + Math.random() * .26) : W * (.72 + Math.random() * .26) - 34;
     el.style.left = x + 'px';
@@ -1390,6 +1495,7 @@
   function combo(side, n) {
     const now = Date.now();
     comboN[side] = now - comboT[side] < 1500 ? comboN[side] + n : n;
+    if (comboN[side] >= 40 && comboN[side] - n < 40) wave(side);
     comboT[side] = now;
     const el = side === 'a' ? $('comboA') : $('comboB');
     if (comboN[side] >= 5) { el.textContent = '+' + fmt.format(comboN[side]); el.classList.add('on'); }
@@ -1410,9 +1516,9 @@
       for (let j = 0; j < show; j++) {
         let r = Math.random() * total, k = 0;
         while (k < arr.length - 1 && (r -= arr[k]) >= 0) k++;
-        const e = RX[k];
-        setTimeout(() => fly(side, e, false), Math.random() * 240);
+        setTimeout(() => fly(side, k, false), Math.random() * 240);
       }
+      if (others >= 30) wave(side);
     }
     renderMeter(d);
   }
@@ -1438,7 +1544,8 @@
 
   function tap(side, i) {
     queue[side][i]++; mine[side]++;
-    fly(side, RX[i], true);
+    fly(side, i, true);
+    if (RX[i].id === 'confirma') urnaBeep();
     combo(side, 1);
     try { navigator.vibrate && navigator.vibrate(6); } catch {}
   }
@@ -1451,7 +1558,7 @@
       const box = $(id);
       box.style.setProperty('--c', colorOf(c, idx));
       const name = `<span class="who-s">${shortNm(c)}</span>`;
-      const btns = RX.map((e, i) => `<button class="rx" data-s="${side}" data-i="${i}" aria-label="Reagir ${e} por ${c.nm}">${e}</button>`).join('');
+      const btns = RX.map((r, i) => `<button class="rx${r.id === 'confirma' ? ' wide' : ''}" data-id="${r.id}" data-s="${side}" data-i="${i}" title="${r.nome}" aria-label="${r.nome} para ${c.nm}">${sticker(i, side)}</button>`).join('');
       box.innerHTML = side === 'a' ? name + btns : btns + name;
     });
     $('comboA').style.setProperty('--c', colorOf(A, 0)); $('comboB').style.setProperty('--c', colorOf(B, 1));
