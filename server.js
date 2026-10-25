@@ -24,8 +24,8 @@ const status = { ok: false, lastOk: 0, lastErr: '', checks: 0, startedAt: Date.n
 const clients = new Set();
 // audiência: cada navegador manda um código aleatório (sem nenhum dado pessoal); várias abas contam como uma pessoa
 const watching = new Map();           // código -> conexões abertas
-const seen = new Set();               // códigos que já passaram desde que o servidor ligou
-let peak = 0, peakAt = 0;
+const seen = new Set();               // códigos que já passaram por aqui (salvos em disco, ver mais abaixo)
+let peak = 0, peakAt = 0, since = Date.now();
 
 // ---------- TSE ----------
 function decode(text) {
@@ -130,7 +130,7 @@ function setStatus(ok, err) {
 }
 // "ok" = conseguiu falar com o TSE nos últimos 5s; se não, as páginas passam a buscar direto no TSE
 const publicStatus = () => ({ ok: Date.now() - status.lastOk < 5000, lastOk: status.lastOk, now: Date.now(),
-  viewers: watching.size, total: seen.size, peak, peakAt, since: status.startedAt, torcida: torcidaStatus() });
+  viewers: watching.size, total: seen.size, peak, peakAt, since, torcida: torcidaStatus() });
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -188,7 +188,7 @@ const EMOJIS = 6;
 const SIDES = ['a', 'b'];
 const pending = { a: new Array(EMOJIS).fill(0), b: new Array(EMOJIS).fill(0) };
 let pendingAny = false;
-const torcida = { a: 0, b: 0 };                 // total desde que o servidor ligou
+const torcida = { a: 0, b: 0 };                 // total de reações (salvo em disco junto com a audiência)
 const perSecond = new Map();                    // segundo -> { a, b }, para a janela do último minuto
 const limits = new Map();                       // limite de envio por pessoa e por IP
 
@@ -302,11 +302,41 @@ http.createServer((req, res) => {
   if (pathname === '/api/react' && req.method === 'POST') return react(req, res, new URL(req.url, 'http://x'));
   if (pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    return res.end(JSON.stringify({ ...publicStatus(), lastErr: status.lastErr, firstRound: Object.keys(first).length, election, clients: clients.size, checks: status.checks, files: Object.keys(files).length }));
+    return res.end(JSON.stringify({ ...publicStatus(), lastErr: status.lastErr, dataDir: DATA_DIR, firstRound: Object.keys(first).length, election, clients: clients.size, checks: status.checks, files: Object.keys(files).length }));
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   serveStatic(req, res, pathname);
 }).listen(PORT, () => console.log(`Apuração ao vivo em http://localhost:${PORT}`));
+
+// ---------- totais salvos em disco ----------
+// Para os números não zerarem quando o servidor reinicia. No Railway, anexe um Volume ao serviço:
+// ele cria RAILWAY_VOLUME_MOUNT_PATH e os totais passam a sobreviver também a novas publicações.
+const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '.data');
+const STATS_FILE = path.join(DATA_DIR, 'totais.json');
+function loadStats() {
+  try {
+    const d = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
+    (d.seen || []).forEach(v => seen.add(v));
+    peak = d.peak || 0; peakAt = d.peakAt || 0; since = d.since || since;
+    torcida.a = d.torcida && d.torcida.a || 0; torcida.b = d.torcida && d.torcida.b || 0;
+    console.log(`totais carregados: ${seen.size} visitantes, ${torcida.a + torcida.b} reações`);
+  } catch (e) { if (e.code !== 'ENOENT') console.error('[totais]', e.message); }
+}
+let savedKey = '';
+function saveStats() {
+  const key = [seen.size, peak, torcida.a, torcida.b].join();
+  if (key === savedKey) return;
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const tmp = STATS_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ seen: [...seen], peak, peakAt, since, torcida }));
+    fs.renameSync(tmp, STATS_FILE);
+    savedKey = key;
+  } catch (e) { console.error('[totais]', e.message); }
+}
+loadStats();
+setInterval(saveStats, 15000);
+['SIGTERM', 'SIGINT'].forEach(sig => process.on(sig, () => { saveStats(); process.exit(0); }));
 
 nationalLoop();
 statesLoop();
