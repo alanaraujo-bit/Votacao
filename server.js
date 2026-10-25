@@ -188,6 +188,11 @@ const EMOJIS = 6;
 const SIDES = ['a', 'b'];
 const pending = { a: new Array(EMOJIS).fill(0), b: new Array(EMOJIS).fill(0) };
 let pendingAny = false;
+const pendingPeople = { a: new Set(), b: new Set() };
+// quem torce para quem: cada pessoa fica numa torcida e só pode trocar a cada 5 minutos
+const SWITCH_MS = 5 * 60 * 1000;
+const sideOf = new Map();                       // pessoa -> { side, at, last }
+const activePeople = { a: new Map(), b: new Map() }; // pessoa -> último envio (para "pessoas torcendo agora")
 const torcida = { a: 0, b: 0 };                 // total de reações (salvo em disco junto com a audiência)
 const perSecond = new Map();                    // segundo -> { a, b }, para a janela do último minuto
 const limits = new Map();                       // limite de envio por pessoa e por IP
@@ -212,7 +217,13 @@ function lastMinute() {
   }
   return r;
 }
-const torcidaStatus = () => { const m = lastMinute(); return { ta: torcida.a, tb: torcida.b, ma: m.a, mb: m.b }; };
+function peopleNow(side) {
+  const cut = Date.now() - 60000, m = activePeople[side];
+  for (const [k, t] of m) if (t < cut) m.delete(k);
+  return m.size;
+}
+const torcidaStatus = () => { const m = lastMinute(); return { ta: torcida.a, tb: torcida.b, ma: m.a, mb: m.b, pa: peopleNow('a'), pb: peopleNow('b') }; };
+setInterval(() => { const cut = Date.now() - 2 * 3600000; for (const [k, v] of sideOf) if (v.last < cut) sideOf.delete(k); }, 600000);
 
 function react(req, res, url) {
   const side = url.searchParams.get('s');
@@ -227,7 +238,15 @@ function react(req, res, url) {
     if (ok) want += Math.min(n, 30);
     return ok ? [e, Math.min(n, 30)] : null;
   }).filter(Boolean);
-  let budget = allow('v:' + (/^[a-z0-9]{8,40}$/i.test(raw) ? raw : ip), want, 8, 24);
+  const who = /^[a-z0-9]{8,40}$/i.test(raw) ? raw : 'ip:' + ip;
+  const now = Date.now(), cur = sideOf.get(who);
+  if (cur && cur.side !== side && now - cur.at < SWITCH_MS) {
+    res.writeHead(409, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    return res.end(JSON.stringify({ side: cur.side, wait: SWITCH_MS - (now - cur.at) }));
+  }
+  if (!cur || cur.side !== side) sideOf.set(who, { side, at: now, last: now }); else cur.last = now;
+  // mesma "energia" da página: ~2 reações por segundo, até 12 de uma vez
+  let budget = allow('v:' + who, want, 2.3, 12);
   // limite por IP alto: no celular, muita gente diferente sai pelo mesmo IP da operadora
   budget = allow('i:' + ip, budget, 400, 1200);
   let used = 0;
@@ -238,6 +257,8 @@ function react(req, res, url) {
   }
   if (used) {
     pendingAny = true;
+    pendingPeople[side].add(who);
+    activePeople[side].set(who, now);
     torcida[side] += used;
     const sec = Math.floor(Date.now() / 1000), b = perSecond.get(sec) || { a: 0, b: 0 };
     b[side] += used; perSecond.set(sec, b);
@@ -248,8 +269,8 @@ function react(req, res, url) {
 
 setInterval(() => {
   if (!pendingAny) return;
-  broadcast('react', { a: pending.a, b: pending.b, ...torcidaStatus() });
-  pending.a.fill(0); pending.b.fill(0); pendingAny = false;
+  broadcast('react', { a: pending.a, b: pending.b, p: { a: pendingPeople.a.size, b: pendingPeople.b.size }, ...torcidaStatus() });
+  pending.a.fill(0); pending.b.fill(0); pendingPeople.a.clear(); pendingPeople.b.clear(); pendingAny = false;
 }, 250);
 
 function stream(req, res) {

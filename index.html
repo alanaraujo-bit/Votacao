@@ -265,25 +265,12 @@
 
   /* torcida ao vivo */
   body.has-dock { padding-bottom: 120px; }
-  .fx { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
-  .fly { position: absolute; bottom: 90px; width: 40px; height: 40px; will-change: transform, opacity; user-select: none;
-         filter: drop-shadow(0 6px 14px rgba(0,0,0,.5)) drop-shadow(0 0 10px color-mix(in srgb, var(--glow) 55%, transparent)); }
-  .fly { width: 56px; height: auto; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .fly .tok { width: 52px; height: 52px; border-radius: 50%; padding: 9px; display: grid; place-items: center;
-              background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 30%, #1b1c1f), #0d0e10 75%);
-              border: 3px solid var(--c); box-shadow: 0 0 20px var(--c), inset 0 0 12px color-mix(in srgb, var(--c) 35%, transparent); }
-  .fly .tok svg { width: 100%; height: 100%; display: block; overflow: visible; }
-  .fly.wide { width: 86px; } .fly.wide .tok { width: 84px; height: 46px; border-radius: 12px; padding: 5px 7px; }
-  .fly .tag { font-size: 10px; font-weight: 700; color: #fff; background: var(--c); padding: 1px 7px; border-radius: 999px; white-space: nowrap;
-              letter-spacing: .02em; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
-  .fly.mine { transform-origin: center; } .fly.mine .tok { width: 62px; height: 62px; } .fly.mine.wide .tok { width: 100px; height: 54px; }
-  .fly.mine .tok { box-shadow: 0 0 0 2px #fff, 0 0 26px var(--c); }
+  .fx { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 30; }
   .edge { position: fixed; top: 0; bottom: 0; width: 26vw; max-width: 260px; z-index: 29; pointer-events: none; opacity: 0; }
   .edge.left { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--c, #000) 45%, transparent), transparent); }
   .edge.right { right: 0; background: linear-gradient(270deg, color-mix(in srgb, var(--c, #000) 45%, transparent), transparent); }
   .edge.on { animation: edge 1.1s ease-out; }
   @keyframes edge { 0% { opacity: .9; } 100% { opacity: 0; } }
-  .confetti { position: absolute; top: -12px; width: 8px; height: 13px; border-radius: 2px; will-change: transform, opacity; }
   .dock { position: fixed; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 25;
           width: min(1060px, calc(100% - 24px)); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px;
           padding: 10px; border-radius: 18px; border: 1px solid var(--line-2);
@@ -305,10 +292,6 @@
   .meter .mbar { height: 8px; display: flex; gap: 2px; margin: 6px 0 5px; border-radius: 999px; overflow: hidden; }
   .meter .mbar > div { transition: width .6s cubic-bezier(.2,.8,.2,1); border-radius: 999px; }
   .meter .nums { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; }
-  .combo { position: fixed; bottom: 96px; z-index: 31; pointer-events: none; font-size: 15px; font-weight: 700; color: #fff;
-           padding: 4px 10px; border-radius: 999px; background: var(--c); box-shadow: 0 0 24px var(--c); opacity: 0; transition: opacity .2s; }
-  .combo.on { opacity: 1; }
-  .combo.left { left: max(14px, calc(50% - 520px)); } .combo.right { right: max(14px, calc(50% - 520px)); }
   @media (min-width: 721px) and (max-width: 1100px) { .rx[data-id=urna], .rx[data-id=mega] { display: none; } }
   .meter .hot { font-size: 11px; color: var(--text-2); min-height: 14px; margin-top: 3px; }
   @media (max-width: 720px) {
@@ -326,9 +309,21 @@
     .rx.wide { flex: 1.7 1 0; max-width: 70px; padding: 6px 3px; }
     .rx[data-id=urna], .rx[data-id=mega] { display: none; }
     body.has-dock { padding-bottom: 130px; }
-    .combo { bottom: 118px; }
   }
   @media (min-width: 721px) { .dock-row { display: contents; } #btnsA { order: 0; } #meter { order: 1; } #btnsB { order: 2; } }
+
+  .side-btns.locked .rx { opacity: .32; filter: grayscale(.7); }
+  .side-btns.locked .rx:hover { opacity: .5; }
+  .dock.tired .side-btns:not(.locked) .rx { opacity: .55; }
+  .energy { position: absolute; left: 14px; right: 14px; bottom: 4px; height: 3px; border-radius: 999px; background: rgba(255,255,255,.06); overflow: hidden; }
+  .energy[hidden] { display: none; }
+  .energy i { display: block; height: 100%; width: 100%; border-radius: 999px; transition: width .15s linear; }
+  .rx-note { position: fixed; left: 50%; bottom: 104px; transform: translate(-50%, 8px); z-index: 33; opacity: 0; pointer-events: none;
+             max-width: calc(100% - 24px); width: max-content; font-size: 13px; color: var(--text); padding: 8px 12px; border-radius: 12px;
+             background: rgba(20,21,23,.95); border: 1px solid var(--line-2); box-shadow: 0 10px 30px rgba(0,0,0,.5); transition: opacity .2s, transform .2s; }
+  .rx-note.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .rx-note button { margin-left: 8px; height: 26px; padding: 0 10px; border-radius: 8px; border: 0; background: var(--text); color: #08090a; font-weight: 600; font-size: 12px; }
+  @media (max-width: 720px) { .rx-note { bottom: 136px; } }
 
   /* prova social real + compartilhar */
   .social { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: -18px 0 18px; font-size: 13px; color: var(--muted); }
@@ -550,12 +545,11 @@
   </footer>
 </div>
 
-<div class="fx" id="fx" aria-hidden="true"></div>
+<canvas class="fx" id="fxc" aria-hidden="true"></canvas>
 <div class="edge left" id="edgeA"></div>
 <div class="edge right" id="edgeB"></div>
 <div class="joined" id="joined"></div>
-<div class="combo left" id="comboA"></div>
-<div class="combo right" id="comboB"></div>
+<div class="rx-note" id="rxNote" role="status"></div>
 <div class="dock" id="dock" hidden>
   <div class="meter" id="meter">
     <div class="lab">Torcida no último minuto</div>
@@ -564,6 +558,7 @@
     <div class="hot" id="mHot"></div>
     <button class="wa small" id="waDock" type="button"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2s.2-1.1.2-1.2-.2-.2-.5-.3z"/></svg><span>Chamar no WhatsApp</span></button>
   </div>
+  <div class="energy" id="energyBox" hidden title="Energia: recarrega sozinha"><i id="energy"></i></div>
   <div class="dock-row">
     <div class="side-btns" id="btnsA"></div>
     <div class="side-btns right" id="btnsB"></div>
@@ -1493,97 +1488,210 @@
     } catch {}
   }
 
-  // quando um lado manda muitas reações de uma vez: chuva de confete na metade dele
-  let waveAt = { a: 0, b: 0 };
-  function wave(side) {
-    if (Date.now() - waveAt[side] < 2500) return;
-    waveAt[side] = Date.now();
-    const { color } = sideInfo(side), fx = $('fx'), W = innerWidth, H = innerHeight, left = side === 'a';
-    for (let k = 0; k < 36; k++) {
-      const el = document.createElement('i');
-      el.className = 'confetti';
-      el.style.background = k % 3 ? color : '#f7d774';
-      el.style.left = (left ? W * (.02 + Math.random() * .44) : W * (.54 + Math.random() * .44)) + 'px';
-      fx.appendChild(el);
-      const fall = H * (.5 + Math.random() * .5), dx = (Math.random() - .5) * 160, rot = Math.random() * 720;
-      el.animate([
-        { transform: 'translate(0,0) rotate(0)', opacity: 1 },
-        { transform: `translate(${dx}px,${fall}px) rotate(${rot}deg)`, opacity: 0 },
-      ], { duration: 1800 + Math.random() * 1400, easing: 'cubic-bezier(.25,.6,.4,1)', delay: Math.random() * 300 }).onfinish = () => el.remove();
+  // ---------- animação da torcida num <canvas> só ----------
+  // Cada figurinha (por lado) é desenhada uma vez numa imagem; depois só copiamos a imagem a cada quadro.
+  // Muito mais leve que um elemento HTML com sombra por figurinha, e o limite se ajusta ao celular.
+  const fxc = $('fxc'), fctx = fxc.getContext('2d');
+  const sprites = { a: [], b: [] };
+  const parts = [];
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let cap = REDUCED ? 12 : innerWidth < 720 ? 45 : 90, capMax = cap, raf = 0, lastFrame = 0, slow = 0, dpr = 1;
+
+  function sizeCanvas() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    fxc.width = innerWidth * dpr; fxc.height = innerHeight * dpr;
+  }
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  function buildSprites() {
+    if (sprites.a.length || !last || last.cand.length < 2) return;
+    for (const side of ['a', 'b']) {
+      const { c, color } = sideInfo(side), name = shortNm(c).replace(/[<&]/g, '');
+      RX.forEach((r, i) => {
+        const wide = r.id === 'confirma', W = wide ? 96 : 64, H = wide ? 76 : 84, S = 2;
+        const inner = sticker(i, side).replace('<svg ', `<svg x="${wide ? 12 : 13}" y="${wide ? 11 : 11}" width="${wide ? 72 : 38}" height="${wide ? 40 : 38}" `);
+        const tok = wide
+          ? `<rect x="6" y="4" width="84" height="48" rx="12" fill="#0d0e10" stroke="${color}" stroke-width="3"/>`
+          : `<circle cx="32" cy="30" r="25" fill="#0d0e10" stroke="${color}" stroke-width="3"/>`;
+        const tw = Math.max(36, name.length * 6.2 + 12), ty = wide ? 58 : 62;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W * S}" height="${H * S}" viewBox="0 0 ${W} ${H}">${tok}${inner}
+          <rect x="${W / 2 - tw / 2}" y="${ty}" width="${tw}" height="15" rx="7.5" fill="${color}"/>
+          <text x="${W / 2}" y="${ty + 11}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">${name}</text></svg>`;
+        const img = new Image();
+        const sp = { img: null, w: W, h: H, glow: color };
+        img.onload = () => {
+          // a sombra brilhante já fica "assada" na imagem
+          const cv = document.createElement('canvas'), pad = 16;
+          cv.width = (W + pad * 2) * S; cv.height = (H + pad * 2) * S;
+          const x = cv.getContext('2d');
+          x.shadowColor = color; x.shadowBlur = 14 * S;
+          x.drawImage(img, pad * S, pad * S, W * S, H * S);
+          x.shadowBlur = 0; x.drawImage(img, pad * S, pad * S, W * S, H * S);
+          sp.img = cv; sp.pad = pad;
+        };
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        sprites[side][i] = sp;
+      });
     }
   }
-  const MAX_FLY = 140;
-  let dockReady = false, myVid = '';
-  const queue = { a: new Array(RX.length).fill(0), b: new Array(RX.length).fill(0) };
-  const mine = { a: 0, b: 0 };   // minhas reações ainda não "devolvidas" pelo servidor (para não animar duas vezes)
-  const comboN = { a: 0, b: 0 }, comboT = { a: 0, b: 0 };
 
-  function fly(side, i, isMine) {
-    const fx = $('fx');
-    if (fx.childElementCount >= MAX_FLY || !last) return;
-    const el = document.createElement('span');
-    el.className = 'fly' + (isMine ? ' mine' : '') + (RX[i].id === 'confirma' ? ' wide' : '');
-    el.style.setProperty('--glow', sideInfo(side).color);
-    // cada figurinha vai num "selo" na cor do lado, com o nome do candidato embaixo
-    const si = sideInfo(side);
-    el.innerHTML = `<div class="tok" style="--c:${si.color}">${sticker(i, side)}</div><b class="tag" style="--c:${si.color}">${shortNm(si.c)}</b>`;
-    const W = innerWidth, left = side === 'a';
-    // raias separadas: Lula só na esquerda, Bolsonaro só na direita, sem cruzar o meio
-    const x = left ? W * (.01 + Math.random() * .27) : W * (.72 + Math.random() * .27) - 56;
-    el.style.left = x + 'px';
-    fx.appendChild(el);
-    const H = innerHeight, rise = H * (.45 + Math.random() * .4), drift = (left ? -1 : 1) * (Math.random() * 50 - 10);
-    edge(side);
-    const dur = 2200 + Math.random() * 1800, rot = (Math.random() - .5) * 50, sc = .8 + Math.random() * .6;
-    const anim = el.animate([
-      { transform: `translate(0,0) scale(${sc * .4}) rotate(0deg)`, opacity: 0 },
-      { transform: `translate(${drift * .3}px,${-rise * .15}px) scale(${sc * 1.15}) rotate(${rot * .3}deg)`, opacity: 1, offset: .12 },
-      { transform: `translate(${drift * .7}px,${-rise * .7}px) scale(${sc}) rotate(${rot * .8}deg)`, opacity: .9, offset: .7 },
-      { transform: `translate(${drift}px,${-rise}px) scale(${sc * .9}) rotate(${rot}deg)`, opacity: 0 },
-    ], { duration: dur, easing: 'cubic-bezier(.2,.7,.3,1)' });
-    anim.onfinish = () => el.remove();
+  function spawn(side, i, mine) {
+    if (document.hidden) return;
+    if (parts.length >= cap) { if (!mine) return; parts.shift(); }
+    const sp = sprites[side][i]; if (!sp || !sp.img) return;
+    const W = innerWidth, H = innerHeight, left = side === 'a';
+    const scale = (mine ? .9 : .62 + Math.random() * .3) * (W < 720 ? .85 : 1);
+    const w = (sp.w + sp.pad * 2) * scale;
+    // raias separadas: Lula só na esquerda, Bolsonaro só na direita
+    const x0 = left ? W * (.01 + Math.random() * .25) : W * (.74 + Math.random() * .25) - w;
+    parts.push({ sp, x0, y0: H - (W < 720 ? 150 : 110), rise: H * (.4 + Math.random() * .38), drift: (left ? -1 : 1) * (Math.random() * 40 - 8),
+      rot: (Math.random() - .5) * .5, scale, t0: performance.now() + Math.random() * 200, dur: 2400 + Math.random() * 1400, kind: 's' });
+    loop();
   }
+
+  function confetti(side) {
+    const { color } = sideInfo(side), W = innerWidth, H = innerHeight, left = side === 'a';
+    const n = Math.min(40, cap);
+    for (let k = 0; k < n; k++) parts.push({ kind: 'c', color: k % 3 ? color : '#f7d774',
+      x0: left ? W * (.02 + Math.random() * .44) : W * (.54 + Math.random() * .44), y0: -10, rise: -(H * (.5 + Math.random() * .5)),
+      drift: (Math.random() - .5) * 140, rot: Math.random() * 12, scale: 1, t0: performance.now() + Math.random() * 300, dur: 1800 + Math.random() * 1200 });
+    loop();
+  }
+
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  function frame(now) {
+    raf = 0;
+    // ajusta o limite pelo desempenho do aparelho
+    if (lastFrame) {
+      const dt = now - lastFrame;
+      slow = slow * .9 + (dt > 26 ? 1 : 0) * .1;
+      if (slow > .5 && cap > 15) { cap = Math.round(cap * .75); slow = 0; }
+      else if (slow < .05 && cap < capMax) cap++;
+    }
+    lastFrame = now;
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fctx.clearRect(0, 0, innerWidth, innerHeight);
+    for (let k = parts.length - 1; k >= 0; k--) {
+      const p = parts[k], t = (now - p.t0) / p.dur;
+      if (t < 0) continue;
+      if (t >= 1) { parts.splice(k, 1); continue; }
+      const e = ease(t), x = p.x0 + p.drift * t, y = p.y0 - p.rise * e;
+      fctx.globalAlpha = t < .1 ? t / .1 : t > .7 ? (1 - t) / .3 : 1;
+      if (p.kind === 'c') {
+        fctx.save(); fctx.translate(x, y); fctx.rotate(p.rot * t); fctx.fillStyle = p.color; fctx.fillRect(-4, -6, 8, 12); fctx.restore();
+      } else {
+        const sp = p.sp, pop = t < .12 ? .6 + .4 * (t / .12) * 1.1 : 1, sc = p.scale * pop;
+        const w = (sp.w + sp.pad * 2) * sc, h = (sp.h + sp.pad * 2) * sc;
+        fctx.save(); fctx.translate(x + w / 2, y - h / 2); fctx.rotate(p.rot * t); fctx.drawImage(sp.img, -w / 2, -h / 2, w, h); fctx.restore();
+      }
+    }
+    fctx.globalAlpha = 1;
+    if (parts.length) loop(); else lastFrame = 0;
+  }
+  function loop() { if (!raf) raf = requestAnimationFrame(frame); }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) parts.length = 0; });
 
   // a borda da tela daquele lado acende quando a torcida dele manda reação
   const edgeAt = { a: 0, b: 0 };
   function edge(side) {
     const now = Date.now();
-    if (now - edgeAt[side] < 350) return;
+    if (now - edgeAt[side] < 600) return;
     edgeAt[side] = now;
     const el = side === 'a' ? $('edgeA') : $('edgeB');
     el.style.setProperty('--c', sideInfo(side).color);
     el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
   }
 
-  function combo(side, n) {
-    const now = Date.now();
-    comboN[side] = now - comboT[side] < 1500 ? comboN[side] + n : n;
-    if (comboN[side] >= 40 && comboN[side] - n < 40) wave(side);
-    comboT[side] = now;
-    const el = side === 'a' ? $('comboA') : $('comboB');
-    if (comboN[side] >= 5) { el.textContent = `+${fmt.format(comboN[side])} ${shortNm(sideInfo(side).c)}`; el.classList.add('on'); }
-    clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('on'), 1500);
+  // ---------- torcida: regras ----------
+  // 1) Cada pessoa escolhe uma torcida (pode trocar, mas só a cada 5 minutos).
+  // 2) Cada pessoa tem uma "energia" de 10 reações que recarrega aos poucos: dá para comemorar, não dá para metralhar.
+  // 3) O termômetro conta PESSOAS torcendo no último minuto, não cliques. Metralhar não faz um lado "ganhar".
+  // 4) A quantidade de figurinhas na tela cresce devagar com o tamanho da torcida, então ninguém entope a tela.
+  const ENERGY_MAX = 10, ENERGY_MS = 450, SWITCH_MS = 5 * 60 * 1000;
+  let energy = ENERGY_MAX, energyAt = Date.now();
+  let mySide = '', mySideAt = 0, dockReady = false, myVid = '';
+  try { const m = JSON.parse(localStorage.getItem('apuracao:torcida') || 'null'); if (m) { mySide = m.side; mySideAt = m.at; } } catch {}
+  const queue = { a: new Array(RX.length).fill(0), b: new Array(RX.length).fill(0) };
+  const mine = { a: 0, b: 0 };   // minhas reações ainda não "devolvidas" pelo servidor (para não animar duas vezes)
+  let lastSendAt = 0, sendTimer = 0;
+
+  function refillEnergy() {
+    const now = Date.now(), gain = Math.floor((now - energyAt) / ENERGY_MS);
+    if (gain > 0) { energy = Math.min(ENERGY_MAX, energy + gain); energyAt = energy === ENERGY_MAX ? now : energyAt + gain * ENERGY_MS; }
+    const el = $('energy');
+    if (el) { el.style.width = (energy / ENERGY_MAX * 100) + '%'; $('dock').classList.toggle('tired', energy === 0); }
+  }
+  setInterval(refillEnergy, 150);
+
+  function saveSide(side, at) {
+    mySide = side; mySideAt = at;
+    try { localStorage.setItem('apuracao:torcida', JSON.stringify({ side, at })); } catch {}
+    paintSide();
+  }
+  function paintSide() {
+    $('btnsA').classList.toggle('locked', !!mySide && mySide !== 'a');
+    $('btnsB').classList.toggle('locked', !!mySide && mySide !== 'b');
+    if (mySide && last) {
+      const { color } = sideInfo(mySide);
+      $('energy').style.background = color;
+      $('energyBox').hidden = false;
+    }
   }
 
-  // os pacotes do servidor chegam a cada 250ms; espalha as animações dentro desse intervalo
+  let noteT = 0;
+  function note(html, action) {
+    const el = $('rxNote');
+    el.innerHTML = html + (action ? ` <button type="button" id="rxNoteBtn">${action.label}</button>` : '');
+    el.classList.add('on');
+    if (action) $('rxNoteBtn').onclick = () => { action.run(); el.classList.remove('on'); };
+    clearTimeout(noteT); noteT = setTimeout(() => el.classList.remove('on'), action ? 5000 : 2600);
+  }
+
+  function trySwitch(side) {
+    const wait = mySideAt + SWITCH_MS - Date.now();
+    const other = sideInfo(side).c, cur = sideInfo(mySide).c;
+    if (wait > 0) { note(`Você está na torcida de <b>${shortNm(cur)}</b>. Dá para trocar daqui a ${Math.ceil(wait / 60000)} min.`); return; }
+    note(`Você está na torcida de <b>${shortNm(cur)}</b>.`, { label: `Trocar para ${shortNm(other)}`, run: () => saveSide(side, Date.now()) });
+  }
+
   function onReact(d) {
     for (const side of ['a', 'b']) {
-      const arr = d[side] || [];
-      const total = arr.reduce((x, y) => x + y, 0);
+      const arr = d[side] || [], total = arr.reduce((x, y) => x + y, 0);
       const skip = Math.min(total, mine[side]); mine[side] -= skip;
-      const others = total - skip;
-      if (others > 0) combo(side, others);
-      // no máximo ~14 emojis por lado por pacote, proporcional ao que chegou
-      const show = Math.min(others, 14);
-      // sorteia qual emoji subir, proporcional ao que a torcida mandou
+      const others = total - skip, people = (d.p && d.p[side]) || (others ? 1 : 0);
+      if (others <= 0) continue;
+      edge(side);
+      // cresce devagar: 1 pessoa ≈ 1 figurinha, 60 pessoas ≈ 6, nunca mais que 6 por pacote
+      const show = Math.min(6, Math.ceil(Math.log2(1 + Math.max(1, people))));
       for (let j = 0; j < show; j++) {
         let r = Math.random() * total, k = 0;
         while (k < arr.length - 1 && (r -= arr[k]) >= 0) k++;
-        setTimeout(() => fly(side, k, false), Math.random() * 240);
+        spawn(side, k, false);
       }
-      if (others >= 30) wave(side);
+      if (people >= 12) wave(side);
     }
     renderMeter(d);
+  }
+
+  const waveAt = { a: 0, b: 0 };
+  function wave(side) {
+    if (Date.now() - waveAt[side] < 8000) return;
+    waveAt[side] = Date.now();
+    confetti(side);
+  }
+
+  function renderMeter(t) {
+    if (!t || t.ta == null || !last || last.cand.length < 2) return;
+    const [A, B] = last.cand;
+    const pa = t.pa != null ? t.pa : t.ma, pb = t.pb != null ? t.pb : t.mb, sum = pa + pb, pct = sum ? pa / sum * 100 : 50;
+    $('mA').style.width = pct + '%'; $('mB').style.width = (100 - pct) + '%';
+    $('mAn').textContent = shortNm(A) + ' ' + fmt.format(pa); $('mBn').textContent = fmt.format(pb) + ' ' + shortNm(B);
+    $('mAn').style.color = colorOf(A, 0); $('mBn').style.color = colorOf(B, 1);
+    $('mHot').textContent = `${short(t.ta + t.tb)} comemorações na noite`;
+    $('dock').classList.toggle('idle', !sum);
+    $('meter').querySelector('.lab').textContent = sum ? 'Pessoas torcendo agora' : 'Seja o primeiro a comemorar agora 🎉';
+    lastTorcidaTotal = t.ta + t.tb; renderSocial();
   }
 
   function shareWhatsApp() {
@@ -1594,65 +1702,69 @@
   $('waTop').onclick = shareWhatsApp;
   $('waDock').onclick = shareWhatsApp;
 
-  function renderMeter(t) {
-    if (!t || t.ma == null || !last || last.cand.length < 2) return;
-    const [A, B] = last.cand, sum = t.ma + t.mb, pa = sum ? t.ma / sum * 100 : 50;
-    $('mA').style.width = pa + '%'; $('mB').style.width = (100 - pa) + '%';
-    $('mAn').textContent = shortNm(A) + ' ' + short(t.ma); $('mBn').textContent = short(t.mb) + ' ' + shortNm(B);
-    $('mAn').style.color = colorOf(A, 0); $('mBn').style.color = colorOf(B, 1);
-    $('mHot').textContent = sum ? `${fmt.format(Math.round(sum / 60 * 10) / 10)} reações/s · total ${short(t.ta + t.tb)}` : `${short(t.ta + t.tb)} comemorações na noite`;
-    // sem ninguém torcendo agora: a barra convida em vez de ficar parada
-    $('dock').classList.toggle('idle', !sum);
-    $('meter').querySelector('.lab').textContent = sum ? 'Torcida no último minuto' : 'Seja o primeiro a comemorar agora 🎉';
-    lastTorcidaTotal = t.ta + t.tb; renderSocial();
-  }
-
-  function sendQueue() {
+  async function sendQueue() {
+    sendTimer = 0; lastSendAt = Date.now();
     for (const side of ['a', 'b']) {
       const parts = queue[side].map((n, i) => n ? i + ':' + n : '').filter(Boolean);
       if (!parts.length) continue;
       queue[side].fill(0);
-      fetch(`api/react?s=${side}&c=${parts.join(',')}${myVid ? '&v=' + myVid : ''}`, { method: 'POST', keepalive: true }).catch(() => {});
+      try {
+        const r = await fetch(`api/react?s=${side}&c=${parts.join(',')}${myVid ? '&v=' + myVid : ''}`, { method: 'POST', keepalive: true });
+        if (r.status === 409) { // o servidor diz que você está em outra torcida (ex.: outra aba)
+          const j = await r.json().catch(() => null);
+          if (j && j.side) { saveSide(j.side, Date.now() - SWITCH_MS + (j.wait || 0)); trySwitch(side); }
+        }
+      } catch {}
     }
   }
-  setInterval(sendQueue, 300);
+  // junta os toques: manda na hora se estava parado, senão no máximo 1 envio por segundo
+  function scheduleSend() {
+    if (sendTimer) return;
+    sendTimer = setTimeout(sendQueue, Date.now() - lastSendAt > 1000 ? 80 : 1000);
+  }
 
   function tap(side, i) {
+    if (mySide && mySide !== side) { trySwitch(side); return false; }
+    refillEnergy();
+    if (energy <= 0) { note('Recarregando a energia… segura um pouquinho 🔋'); return false; }
+    if (!mySide) saveSide(side, Date.now());
+    energy--; if (energy === ENERGY_MAX - 1) energyAt = Date.now();
     queue[side][i]++; mine[side]++;
-    fly(side, i, true);
+    spawn(side, i, true); edge(side);
     if (RX[i].id === 'confirma') urnaBeep();
-    combo(side, 1);
     try { navigator.vibrate && navigator.vibrate(6); } catch {}
+    scheduleSend();
+    return true;
   }
 
   function buildDock() {
     if (dockReady || !last || last.cand.length < 2) return;
     dockReady = true;
+    buildSprites();
     const [A, B] = last.cand;
     [['a', A, 0, 'btnsA'], ['b', B, 1, 'btnsB']].forEach(([side, c, idx, id]) => {
       const box = $(id);
       box.style.setProperty('--c', colorOf(c, idx));
-      const name = `<span class="who-s">${shortNm(c)}</span>`;
-      const btns = RX.map((r, i) => `<button class="rx${r.id === 'confirma' ? ' wide' : ''}" data-id="${r.id}" data-s="${side}" data-i="${i}" title="${r.nome}" aria-label="${r.nome} para ${c.nm}">${sticker(i, side)}</button>`).join('');
-      box.innerHTML = side === 'a' ? name + btns : btns + name;
+      box.innerHTML = RX.map((r, i) => `<button class="rx${r.id === 'confirma' ? ' wide' : ''}" data-id="${r.id}" data-s="${side}" data-i="${i}" title="${r.nome}" aria-label="${r.nome} para ${c.nm}">${sticker(i, side)}</button>`).join('');
     });
-    $('comboA').style.setProperty('--c', colorOf(A, 0)); $('comboB').style.setProperty('--c', colorOf(B, 1));
     $('mA').style.background = colorOf(A, 0); $('mB').style.background = colorOf(B, 1);
-    // segurar o botão manda reações seguidas
+    // segurar o botão repete, no ritmo da energia
     let holdT = 0, holdBtn = null;
     const stop = () => { clearInterval(holdT); holdT = 0; if (holdBtn) holdBtn.classList.remove('hold'); holdBtn = null; };
     $('dock').addEventListener('pointerdown', (e) => {
       const b = e.target.closest('.rx'); if (!b) return;
       e.preventDefault();
-      stop(); holdBtn = b; b.classList.add('hold');
-      tap(b.dataset.s, +b.dataset.i);
-      holdT = setInterval(() => tap(b.dataset.s, +b.dataset.i), 140);
+      stop();
+      if (!tap(b.dataset.s, +b.dataset.i)) return;
+      holdBtn = b; b.classList.add('hold');
+      holdT = setInterval(() => { if (!tap(b.dataset.s, +b.dataset.i)) stop(); }, 300);
     });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('dock').addEventListener(ev, stop));
     window.addEventListener('blur', stop);
     $('dock').addEventListener('contextmenu', (e) => e.preventDefault());
     $('dock').hidden = false;
     document.body.classList.add('has-dock');
+    paintSide();
   }
 
   // ---------- transmissão ao vivo do servidor (server.js) ----------
