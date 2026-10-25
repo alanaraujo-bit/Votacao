@@ -364,6 +364,7 @@
     <div class="chips" id="favChips"></div>
     <label for="interval">Atualizar a cada</label>
     <select id="interval">
+      <option value="0">Instantâneo (sem pausa)</option>
       <option value="1">1 segundo</option>
       <option value="2">2 segundos</option>
       <option value="5">5 segundos</option>
@@ -437,8 +438,8 @@
   const FALLBACK = ['#f2555a', '#4cb782'];
 
   // ---------- estado ----------
-  let cfg = Object.assign({ interval: 1, ciclo: '', eleicao: '', fav: '' }, store.get('cfg', {}));
-  if (!store.get('v3')) { cfg.interval = 1; store.set('v3', 1); } // 15s e 5s foram padrões antigos
+  let cfg = Object.assign({ interval: 0, ciclo: '', eleicao: '', fav: '' }, store.get('cfg', {}));
+  if (!store.get('v4')) { cfg.interval = 0; store.set('v4', 1); } // 15s, 5s e 1s foram padrões antigos
   if (params.get('ciclo')) cfg.ciclo = params.get('ciclo');
   if (params.get('eleicao')) cfg.eleicao = params.get('eleicao');
   let election = null;          // { ciclo, cd }
@@ -478,7 +479,8 @@
     for (let i = 0; i < PROXIES.length; i++) {
       const mode = (proxyMode + i) % PROXIES.length;
       try {
-        const r = await fetch(PROXIES[mode](url), { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        // direto: 'no-cache' revalida com o TSE a cada vez (304 leve quando nada mudou); proxies: sem cache nenhum
+        const r = await fetch(PROXIES[mode](url), { cache: mode ? 'no-store' : 'no-cache', signal: AbortSignal.timeout(8000) });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const j = decode(await r.text());
         if (mode !== proxyMode) { proxyMode = mode; store.set('proxy', mode); }
@@ -898,7 +900,7 @@
     return m ? Date.UTC(+m[3], m[2] - 1, +m[1], +m[4] + 3, +m[5], +m[6]) : 0;
   }
   const ago = (ms) => { const x = Math.max(0, Math.round(ms / 1000)); return x < 60 ? x + 's' : Math.floor(x / 60) + 'min ' + (x % 60) + 's'; };
-  let lastCheck = 0, tickTimer = 0, ticking = false;
+  let lastCheck = 0, tickTimer = 0, ticking = false, fails = 0;
 
   async function tick() {
     if (ticking) return;
@@ -927,13 +929,17 @@
       lastCheck = Date.now();
       setLive(s.pst < 100 || DEMO, DEMO ? 'Simulação' : s.pst >= 100 ? 'Final' : 'Ao vivo');
       showErr('');
+      fails = 0;
     } catch (e) {
+      fails++;
       setLive(false, 'Sem conexão');
       showErr('Não consegui buscar os dados do TSE (' + (e.message || e) + '). Tentando de novo sozinho… Se usar o Brave, desligue o escudo (ícone do leão) para este site.');
     }
     ticking = false;
-    nextAt = Date.now() + cfg.interval * 1000;
-    tickTimer = setTimeout(tick, cfg.interval * 1000);
+    // instantâneo = próxima busca logo que a anterior termina; se der erro, espera mais a cada falha (até 10s)
+    const wait = Math.max(cfg.interval ? cfg.interval * 1000 : 150, fails ? Math.min(10000, 500 * 2 ** fails) : 0);
+    nextAt = Date.now() + wait;
+    tickTimer = setTimeout(tick, wait);
   }
 
   let statesBusy = false;
@@ -946,17 +952,18 @@
       statesBusy = false;
       renderStates();
     }
-    setTimeout(tickStates, Math.max(20, cfg.interval * 3) * 1000);
+    setTimeout(tickStates, Math.max(8, cfg.interval * 3) * 1000);
   }
 
   setInterval(() => {
     const left = Math.max(0, nextAt - Date.now());
-    $('cdTxt').textContent = nextAt ? Math.ceil(left / 1000) + 's' : '—';
-    $('cdRing').style.strokeDashoffset = 94.25 * (1 - left / (cfg.interval * 1000));
+    const instant = !cfg.interval && !fails;
+    $('cdTxt').textContent = instant ? '⚡' : nextAt ? Math.ceil(left / 1000) + 's' : '—';
+    $('cdRing').style.strokeDashoffset = instant ? 0 : 94.25 * (1 - left / Math.max(1000, cfg.interval * 1000));
     if (last) {
       const pub = tseTime(last);
       $('upd').textContent = (pub ? `TSE publicou às ${last.when.split(' ')[1]} (há ${ago(Date.now() - pub)})` : 'Atualizado pelo TSE: ' + (last.when || '—'))
-        + (lastCheck ? ` · conferido há ${ago(Date.now() - lastCheck)}` : '');
+        + (lastCheck ? (Date.now() - lastCheck < 1000 ? ' · conferido agora' : ` · conferido há ${ago(Date.now() - lastCheck)}`) : '');
     }
   }, 250);
 
