@@ -263,6 +263,54 @@
   .ptable .show-sm { display: none; }
   @media (max-width: 560px) { .prob-card { padding: 16px; } .ptable .hide-sm { display: none; } .ptable .show-sm { display: inline; } .ptable .muted { color: var(--faint); font-size: 12px; } }
 
+  /* torcida ao vivo */
+  body.has-dock { padding-bottom: 120px; }
+  .fx { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
+  .fly { position: absolute; bottom: 90px; font-size: 30px; line-height: 1; will-change: transform, opacity; user-select: none;
+         filter: drop-shadow(0 4px 12px rgba(0,0,0,.45)); }
+  .fly.mine { font-size: 38px; }
+  .dock { position: fixed; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 25;
+          width: min(860px, calc(100% - 24px)); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
+          padding: 10px; border-radius: 18px; border: 1px solid var(--line-2);
+          background: rgba(15,16,17,.78); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
+          box-shadow: 0 18px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06); }
+  .dock[hidden] { display: none; }
+  .side-btns { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .side-btns.right { justify-content: flex-end; }
+  .side-btns .who-s { display: none; font-size: 12px; font-weight: 600; color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+  .rx { width: 42px; height: 42px; flex: none; border-radius: 12px; font-size: 22px; line-height: 1; display: grid; place-items: center;
+        background: color-mix(in srgb, var(--c) 12%, rgba(255,255,255,.03)); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+        transition: transform .08s, background .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  .rx:hover { background: color-mix(in srgb, var(--c) 22%, transparent); }
+  .rx:active, .rx.hold { transform: scale(.88); background: color-mix(in srgb, var(--c) 32%, transparent); }
+  .meter { width: 230px; text-align: center; }
+  .meter .lab { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .meter .mbar { height: 8px; display: flex; gap: 2px; margin: 6px 0 5px; border-radius: 999px; overflow: hidden; }
+  .meter .mbar > div { transition: width .6s cubic-bezier(.2,.8,.2,1); border-radius: 999px; }
+  .meter .nums { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; }
+  .combo { position: fixed; bottom: 96px; z-index: 31; pointer-events: none; font-size: 15px; font-weight: 700; color: #fff;
+           padding: 4px 10px; border-radius: 999px; background: var(--c); box-shadow: 0 0 24px var(--c); opacity: 0; transition: opacity .2s; }
+  .combo.on { opacity: 1; }
+  .combo.left { left: max(14px, calc(50% - 430px)); } .combo.right { right: max(14px, calc(50% - 430px)); }
+  .meter .hot { font-size: 11px; color: var(--text-2); min-height: 14px; margin-top: 3px; }
+  @media (max-width: 720px) {
+    .dock { grid-template-columns: 1fr; gap: 8px; padding: 8px; }
+    .meter { width: auto; order: -1; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; text-align: left; }
+    .meter .lab, .meter .hot { display: none; }
+    .meter .mbar { margin: 0; }
+    .meter .nums { display: contents; }
+    .meter .nums span:first-child { order: -1; }
+    .dock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .side-btns .who-s { display: none; }
+    .side-btns { justify-content: flex-start; gap: 5px; }
+    .side-btns.right { justify-content: flex-end; }
+    .rx { flex: 1 1 0; min-width: 0; width: auto; max-width: 44px; height: 40px; font-size: 19px; }
+    .rx:nth-of-type(n+5) { display: none; }
+    body.has-dock { padding-bottom: 130px; }
+    .combo { bottom: 118px; }
+  }
+  @media (min-width: 721px) { .dock-row { display: contents; } #btnsA { order: 0; } #meter { order: 1; } #btnsB { order: 2; } }
+
   /* modo TV: só o essencial, maior */
   body.tv .hide-tv { display: none !important; }
   body.tv .diff { font-size: clamp(90px, 20vw, 280px); }
@@ -449,6 +497,22 @@
     Contornos do mapa: <a href="https://github.com/VictorCazanave/svg-maps">@svg-maps/brazil</a> (CC BY 4.0).<br>
     Para testar sem a apuração rolando, abra com <a href="?demo=1">?demo=1</a> (dados simulados).
   </footer>
+</div>
+
+<div class="fx" id="fx" aria-hidden="true"></div>
+<div class="combo left" id="comboA"></div>
+<div class="combo right" id="comboB"></div>
+<div class="dock" id="dock" hidden>
+  <div class="meter" id="meter">
+    <div class="lab">Torcida no último minuto</div>
+    <div class="mbar"><div id="mA" style="width:50%"></div><div id="mB" style="width:50%"></div></div>
+    <div class="nums"><span id="mAn">0</span><span id="mBn">0</span></div>
+    <div class="hot" id="mHot"></div>
+  </div>
+  <div class="dock-row">
+    <div class="side-btns" id="btnsA"></div>
+    <div class="side-btns right" id="btnsB"></div>
+  </div>
 </div>
 
 <dialog id="cfg">
@@ -1291,6 +1355,124 @@
     }
   }, 250);
 
+
+  // ---------- torcida ao vivo ----------
+  // nome curto para caber nos botões: "Flávio Bolsonaro" vira "Bolsonaro"
+  const shortNm = (c) => c.nm.length > 12 ? c.nm.split(' ').pop() : c.nm;
+  const RX = ['🔥', '🎉', '👏', '🇧🇷', '💪', '😱'];
+  const MAX_FLY = 140;
+  let dockReady = false, myVid = '';
+  const queue = { a: new Array(RX.length).fill(0), b: new Array(RX.length).fill(0) };
+  const mine = { a: 0, b: 0 };   // minhas reações ainda não "devolvidas" pelo servidor (para não animar duas vezes)
+  const comboN = { a: 0, b: 0 }, comboT = { a: 0, b: 0 };
+
+  function fly(side, emoji, isMine) {
+    const fx = $('fx');
+    if (fx.childElementCount >= MAX_FLY) return;
+    const el = document.createElement('span');
+    el.className = 'fly' + (isMine ? ' mine' : '');
+    el.textContent = emoji;
+    const W = innerWidth, left = side === 'a';
+    const x = left ? W * (.02 + Math.random() * .26) : W * (.72 + Math.random() * .26) - 34;
+    el.style.left = x + 'px';
+    fx.appendChild(el);
+    const H = innerHeight, rise = H * (.45 + Math.random() * .4), drift = (Math.random() - .5) * 120 + (left ? 30 : -30);
+    const dur = 2200 + Math.random() * 1800, rot = (Math.random() - .5) * 50, sc = .8 + Math.random() * .6;
+    const anim = el.animate([
+      { transform: `translate(0,0) scale(${sc * .4}) rotate(0deg)`, opacity: 0 },
+      { transform: `translate(${drift * .3}px,${-rise * .15}px) scale(${sc * 1.15}) rotate(${rot * .3}deg)`, opacity: 1, offset: .12 },
+      { transform: `translate(${drift * .7}px,${-rise * .7}px) scale(${sc}) rotate(${rot * .8}deg)`, opacity: .9, offset: .7 },
+      { transform: `translate(${drift}px,${-rise}px) scale(${sc * .9}) rotate(${rot}deg)`, opacity: 0 },
+    ], { duration: dur, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    anim.onfinish = () => el.remove();
+  }
+
+  function combo(side, n) {
+    const now = Date.now();
+    comboN[side] = now - comboT[side] < 1500 ? comboN[side] + n : n;
+    comboT[side] = now;
+    const el = side === 'a' ? $('comboA') : $('comboB');
+    if (comboN[side] >= 5) { el.textContent = '+' + fmt.format(comboN[side]); el.classList.add('on'); }
+    clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('on'), 1500);
+  }
+
+  // os pacotes do servidor chegam a cada 250ms; espalha as animações dentro desse intervalo
+  function onReact(d) {
+    for (const side of ['a', 'b']) {
+      const arr = d[side] || [];
+      const total = arr.reduce((x, y) => x + y, 0);
+      const skip = Math.min(total, mine[side]); mine[side] -= skip;
+      const others = total - skip;
+      if (others > 0) combo(side, others);
+      // no máximo ~14 emojis por lado por pacote, proporcional ao que chegou
+      const show = Math.min(others, 14);
+      // sorteia qual emoji subir, proporcional ao que a torcida mandou
+      for (let j = 0; j < show; j++) {
+        let r = Math.random() * total, k = 0;
+        while (k < arr.length - 1 && (r -= arr[k]) >= 0) k++;
+        const e = RX[k];
+        setTimeout(() => fly(side, e, false), Math.random() * 240);
+      }
+    }
+    renderMeter(d);
+  }
+
+  function renderMeter(t) {
+    if (!t || t.ma == null || !last || last.cand.length < 2) return;
+    const [A, B] = last.cand, sum = t.ma + t.mb, pa = sum ? t.ma / sum * 100 : 50;
+    $('mA').style.width = pa + '%'; $('mB').style.width = (100 - pa) + '%';
+    $('mAn').textContent = shortNm(A) + ' ' + short(t.ma); $('mBn').textContent = short(t.mb) + ' ' + shortNm(B);
+    $('mAn').style.color = colorOf(A, 0); $('mBn').style.color = colorOf(B, 1);
+    $('mHot').textContent = sum ? `${fmt.format(Math.round(sum / 60 * 10) / 10)} reações/s · total ${short(t.ta + t.tb)}` : 'Toque nos emojis para torcer';
+  }
+
+  function sendQueue() {
+    for (const side of ['a', 'b']) {
+      const parts = queue[side].map((n, i) => n ? i + ':' + n : '').filter(Boolean);
+      if (!parts.length) continue;
+      queue[side].fill(0);
+      fetch(`api/react?s=${side}&c=${parts.join(',')}${myVid ? '&v=' + myVid : ''}`, { method: 'POST', keepalive: true }).catch(() => {});
+    }
+  }
+  setInterval(sendQueue, 300);
+
+  function tap(side, i) {
+    queue[side][i]++; mine[side]++;
+    fly(side, RX[i], true);
+    combo(side, 1);
+    try { navigator.vibrate && navigator.vibrate(6); } catch {}
+  }
+
+  function buildDock() {
+    if (dockReady || !last || last.cand.length < 2) return;
+    dockReady = true;
+    const [A, B] = last.cand;
+    [['a', A, 0, 'btnsA'], ['b', B, 1, 'btnsB']].forEach(([side, c, idx, id]) => {
+      const box = $(id);
+      box.style.setProperty('--c', colorOf(c, idx));
+      const name = `<span class="who-s">${shortNm(c)}</span>`;
+      const btns = RX.map((e, i) => `<button class="rx" data-s="${side}" data-i="${i}" aria-label="Reagir ${e} por ${c.nm}">${e}</button>`).join('');
+      box.innerHTML = side === 'a' ? name + btns : btns + name;
+    });
+    $('comboA').style.setProperty('--c', colorOf(A, 0)); $('comboB').style.setProperty('--c', colorOf(B, 1));
+    $('mA').style.background = colorOf(A, 0); $('mB').style.background = colorOf(B, 1);
+    // segurar o botão manda reações seguidas
+    let holdT = 0, holdBtn = null;
+    const stop = () => { clearInterval(holdT); holdT = 0; if (holdBtn) holdBtn.classList.remove('hold'); holdBtn = null; };
+    $('dock').addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('.rx'); if (!b) return;
+      e.preventDefault();
+      stop(); holdBtn = b; b.classList.add('hold');
+      tap(b.dataset.s, +b.dataset.i);
+      holdT = setInterval(() => tap(b.dataset.s, +b.dataset.i), 140);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('dock').addEventListener(ev, stop));
+    window.addEventListener('blur', stop);
+    $('dock').addEventListener('contextmenu', (e) => e.preventDefault());
+    $('dock').hidden = false;
+    document.body.classList.add('has-dock');
+  }
+
   // ---------- transmissão ao vivo do servidor (server.js) ----------
   // Quando a página é aberta pelo servidor, ele busca no TSE e empurra cada mudança na hora (Server-Sent Events).
   // Se a transmissão cair, ou o servidor não conseguir falar com o TSE, a página volta a buscar direto no TSE sozinha.
@@ -1312,6 +1494,7 @@
   }
   function onStatus(st) {
     showAudience(st);
+    if (st.torcida) { buildDock(); renderMeter(st.torcida); }
     pushSeen = Date.now();
     pushOk = !!st.ok;
     if (st.ok && st.lastOk && st.now) pushLastOk = Date.now() - (st.now - st.lastOk);
@@ -1334,6 +1517,7 @@
     let opened = false;
     let vid = '';
     try { vid = localStorage.getItem('apuracao:vid') || ''; if (!vid) { vid = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('apuracao:vid', vid); } } catch {}
+    myVid = vid;
     es = new EventSource('api/stream' + (vid ? '?v=' + vid : ''));
     es.onopen = () => { opened = true; };
     es.addEventListener('hello', (e) => {
@@ -1346,6 +1530,7 @@
     });
     es.addEventListener('file', (e) => { const d = JSON.parse(e.data); applyFile(d.uf, d.data); });
     es.addEventListener('status', (e) => onStatus(JSON.parse(e.data)));
+    es.addEventListener('react', (e) => { buildDock(); onReact(JSON.parse(e.data)); });
     es.addEventListener('first', (e) => { firstRaw = JSON.parse(e.data); firstTried = false; scheduleStates(); });
     es.onerror = () => {
       pushOk = false;

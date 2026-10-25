@@ -130,7 +130,7 @@ function setStatus(ok, err) {
 }
 // "ok" = conseguiu falar com o TSE nos últimos 5s; se não, as páginas passam a buscar direto no TSE
 const publicStatus = () => ({ ok: Date.now() - status.lastOk < 5000, lastOk: status.lastOk, now: Date.now(),
-  viewers: watching.size, total: seen.size, peak, peakAt, since: status.startedAt });
+  viewers: watching.size, total: seen.size, peak, peakAt, since: status.startedAt, torcida: torcidaStatus() });
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -181,6 +181,77 @@ function broadcast(event, data) {
 }
 setInterval(() => broadcast('status', publicStatus()), 1000);
 
+// ---------- torcida ao vivo ----------
+// Cada pessoa manda reações (só emojis, sem texto) para um dos lados. O servidor junta tudo a cada 250ms
+// e transmite um pacote só, então funciona igual com 10 ou 10.000 pessoas.
+const EMOJIS = 6;
+const SIDES = ['a', 'b'];
+const pending = { a: new Array(EMOJIS).fill(0), b: new Array(EMOJIS).fill(0) };
+let pendingAny = false;
+const torcida = { a: 0, b: 0 };                 // total desde que o servidor ligou
+const perSecond = new Map();                    // segundo -> { a, b }, para a janela do último minuto
+const limits = new Map();                       // limite de envio por pessoa e por IP
+
+function allow(key, n, rate, burst) {
+  const now = Date.now();
+  let l = limits.get(key);
+  if (!l) { l = { tokens: burst, at: now }; limits.set(key, l); }
+  l.tokens = Math.min(burst, l.tokens + (now - l.at) / 1000 * rate);
+  l.at = now;
+  const ok = Math.max(0, Math.min(n, Math.floor(l.tokens)));
+  l.tokens -= ok;
+  return ok;
+}
+setInterval(() => { const now = Date.now(); for (const [k, l] of limits) if (now - l.at > 60000) limits.delete(k); }, 30000);
+
+function lastMinute() {
+  const sec = Math.floor(Date.now() / 1000), r = { a: 0, b: 0 };
+  for (const [t, v] of perSecond) {
+    if (t <= sec - 60) perSecond.delete(t);
+    else { r.a += v.a; r.b += v.b; }
+  }
+  return r;
+}
+const torcidaStatus = () => { const m = lastMinute(); return { ta: torcida.a, tb: torcida.b, ma: m.a, mb: m.b }; };
+
+function react(req, res, url) {
+  const side = url.searchParams.get('s');
+  const raw = url.searchParams.get('v') || '';
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  if (!SIDES.includes(side)) { res.writeHead(400); return res.end(); }
+  // c = "emoji:quantidade,emoji:quantidade" (o navegador junta os toques de ~300ms num envio só)
+  let want = 0;
+  const asks = String(url.searchParams.get('c') || '').split(',').slice(0, EMOJIS).map(x => {
+    const [e, n] = x.split(':').map(Number);
+    const ok = Number.isInteger(e) && e >= 0 && e < EMOJIS && Number.isInteger(n) && n > 0;
+    if (ok) want += Math.min(n, 30);
+    return ok ? [e, Math.min(n, 30)] : null;
+  }).filter(Boolean);
+  let budget = allow('v:' + (/^[a-z0-9]{8,40}$/i.test(raw) ? raw : ip), want, 8, 24);
+  // limite por IP alto: no celular, muita gente diferente sai pelo mesmo IP da operadora
+  budget = allow('i:' + ip, budget, 400, 1200);
+  let used = 0;
+  for (const [e, n] of asks) {
+    const k = Math.min(n, budget - used);
+    if (k <= 0) break;
+    pending[side][e] += k; used += k;
+  }
+  if (used) {
+    pendingAny = true;
+    torcida[side] += used;
+    const sec = Math.floor(Date.now() / 1000), b = perSecond.get(sec) || { a: 0, b: 0 };
+    b[side] += used; perSecond.set(sec, b);
+  }
+  res.writeHead(204, { 'cache-control': 'no-store' });
+  res.end();
+}
+
+setInterval(() => {
+  if (!pendingAny) return;
+  broadcast('react', { a: pending.a, b: pending.b, ...torcidaStatus() });
+  pending.a.fill(0); pending.b.fill(0); pendingAny = false;
+}, 250);
+
 function stream(req, res) {
   res.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
@@ -228,6 +299,7 @@ function notFound(res) { res.writeHead(404, { 'content-type': 'text/plain' }); r
 http.createServer((req, res) => {
   const { pathname } = new URL(req.url, 'http://x');
   if (pathname === '/api/stream') return stream(req, res);
+  if (pathname === '/api/react' && req.method === 'POST') return react(req, res, new URL(req.url, 'http://x'));
   if (pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     return res.end(JSON.stringify({ ...publicStatus(), lastErr: status.lastErr, firstRound: Object.keys(first).length, election, clients: clients.size, checks: status.checks, files: Object.keys(files).length }));
