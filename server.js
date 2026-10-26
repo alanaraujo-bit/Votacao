@@ -109,8 +109,20 @@ async function refresh(uf) {
   if (prev && olderThan(s, prev)) return true;
   m.key = key;
   files[uf] = s;
+  if (uf === 'br') addHistory(s);
   broadcast('file', { uf, data: s });
   return true;
+}
+
+// histórico da apuração nacional (um ponto por % apurado), para quem chega depois ver como foi a noite
+let hist = [];
+function addHistory(s) {
+  const pst = pstNum(s.s.pst), v = {};
+  s.carg[0].agr[0].par[0].cand.forEach(c => { v[String(c.n)] = Number(String(c.vap || 0).replace(/\D/g, '')) || 0; });
+  const lastH = hist[hist.length - 1];
+  if (lastH && lastH.pst === pst) { lastH.v = v; return; }
+  if (pst <= 0 || hist.length >= 3000) return;
+  hist.push({ pst, t: Date.now(), v });
 }
 
 function tseMs(s) {
@@ -287,7 +299,7 @@ function stream(req, res) {
   watching.set(vid, (watching.get(vid) || 0) + 1);
   if (seen.size < 5e6) seen.add(vid);
   if (watching.size > peak) { peak = watching.size; peakAt = Date.now(); }
-  send(res, 'hello', { election, status: publicStatus(), files, first: Object.keys(first).length >= 20 ? first : null });
+  send(res, 'hello', { election, status: publicStatus(), files, hist, first: Object.keys(first).length >= 20 ? first : null });
   clients.add(res);
   req.on('close', () => {
     clients.delete(res);
@@ -340,17 +352,18 @@ function loadStats() {
     (d.seen || []).forEach(v => seen.add(v));
     peak = d.peak || 0; peakAt = d.peakAt || 0; since = d.since || since;
     torcida.a = d.torcida && d.torcida.a || 0; torcida.b = d.torcida && d.torcida.b || 0;
+    if (Array.isArray(d.hist)) hist = d.hist;
     console.log(`totais carregados: ${seen.size} visitantes, ${torcida.a + torcida.b} reações`);
   } catch (e) { if (e.code !== 'ENOENT') console.error('[totais]', e.message); }
 }
 let savedKey = '';
 function saveStats() {
-  const key = [seen.size, peak, torcida.a, torcida.b].join();
+  const key = [seen.size, peak, torcida.a, torcida.b, hist.length].join();
   if (key === savedKey) return;
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     const tmp = STATS_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify({ seen: [...seen], peak, peakAt, since, torcida }));
+    fs.writeFileSync(tmp, JSON.stringify({ seen: [...seen], peak, peakAt, since, torcida, hist }));
     fs.renameSync(tmp, STATS_FILE);
     savedKey = key;
   } catch (e) { console.error('[totais]', e.message); }
