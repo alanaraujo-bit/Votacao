@@ -827,7 +827,7 @@
     }
     const all = raw.map(c => ({
       n: String(c.n), nm: firstName(c.nmu || c.nm), votes: num(c.vap), pct: num(c.pvap),
-      elected: /^eleit/i.test(c.st || '') || (!j.carg && c.e === 's'),
+      elected: (/^eleit/i.test(c.st || '') && !/n[ãa]o/i.test(c.st || '')) || (!j.carg && c.e === 's'),
     }));
     const cand = all.slice().sort((a, b) => b.votes - a.votes || num(a.n) - num(b.n)).slice(0, 2)
       .sort((a, b) => num(a.n) - num(b.n));
@@ -836,6 +836,7 @@
     const vt = j.v && typeof j.v === 'object' ? j.v : j;
     return {
       all,
+      tf: j.tf, md: j.md,
       pst: num(sec.pst),
       when: [j.dg, j.hg].filter(Boolean).join(' '),
       cand,
@@ -1765,7 +1766,9 @@
     const [A, B] = last.cand;
     const pa = t.pa != null ? t.pa : t.ma, pb = t.pb != null ? t.pb : t.mb, sum = pa + pb, pct = sum ? pa / sum * 100 : 50;
     $('mA').style.width = pct + '%'; $('mB').style.width = (100 - pct) + '%';
-    $('mAn').textContent = shortNm(A) + ' ' + fmt.format(pa); $('mBn').textContent = fmt.format(pb) + ' ' + shortNm(B);
+    // com pouca gente, mostra só os nomes (o número aparece quando a torcida cresce)
+    const few = sum < 5;
+    $('mAn').textContent = shortNm(A) + (few ? '' : ' ' + fmt.format(pa)); $('mBn').textContent = (few ? '' : fmt.format(pb) + ' ') + shortNm(B);
     $('mAn').style.color = colorOf(A, 0); $('mBn').style.color = colorOf(B, 1);
     $('mHot').textContent = `${short(t.ta + t.tb)} comemorações na noite`;
     $('dock').classList.toggle('idle', !sum);
@@ -1850,7 +1853,15 @@
   // Quando o TSE declara o eleito (ou a apuração chega a 100%), o painel ao vivo dá lugar a uma página estática de resultado.
   const FORCE_FINAL = params.has('final');
   let reportKey = '';
-  const isFinal = () => FORCE_FINAL || (last && (last.pst >= 100 || last.cand.some(c => c.elected)));
+  let serverFinal = false;
+  // fim: TSE marcou o eleito, totalização final, 100% apurado, ou resultado matematicamente decidido
+  // (com 95% ou mais apurado, a diferença já é maior que 1,5 vez todos os votos que ainda faltam)
+  function decided() {
+    if (!last || last.cand.length < 2 || last.pst < 95 || last.pst >= 100) return false;
+    const [A, B] = last.cand, valid = A.votes + B.votes, rem = valid * (100 - last.pst) / last.pst;
+    return Math.abs(A.votes - B.votes) > rem * 1.5;
+  }
+  const isFinal = () => FORCE_FINAL || serverFinal || (last && (last.pst >= 100 || last.cand.some(c => c.elected) || last.tf === 's' || /^[se]$/.test(last.md || '') || decided()));
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pc2 = (x) => fmt2.format(x) + '%';
   // artigo de cada estado, para escrever "a Bahia", "da Bahia", "de São Paulo"
@@ -1956,13 +1967,15 @@
 
     // texto
     const tone = pp < 2 ? 'Foi uma disputa muito apertada, decidida voto a voto.' : pp < 6 ? 'Foi uma vitória clara, mas sem grande folga.' : 'Foi uma vitória ampla.';
-    const p1 = `Com ${pstTxt(last.pst)} das urnas apuradas, <b style="color:${cw}">${esc(W.nm)}</b> ${elected ? 'foi eleito' : 'terminou à frente'} com <b>${pc2(pW)}</b> dos votos válidos, contra ${pc2(pL)} de ${esc(L.nm)}. A diferença foi de <b>${fmt.format(margin)} votos</b> (${fmt2.format(pp)} pontos percentuais). ${tone}`;
+    const p1 = `Com ${pstTxt(last.pst)} das urnas apuradas, <b style="color:${cw}">${esc(W.nm)}</b> ${elected ? 'foi eleito' : last.pst < 100 ? 'tem a vitória matematicamente garantida,' : 'terminou à frente'} com <b>${pc2(pW)}</b> dos votos válidos, contra ${pc2(pL)} de ${esc(L.nm)}. A diferença foi de <b>${fmt.format(margin)} votos</b> (${fmt2.format(pp)} pontos percentuais). ${tone}${!elected && last.pst < 100 ? ` Os cerca de ${votosTxt(valid * (100 - last.pst) / last.pst)} que ainda faltam apurar não mudam o resultado.` : ''}`;
     let p2 = '';
     if (rows.length >= 20) {
       const ties = rows.filter(r => r.uf !== 'zz' && r.margin === 0).length;
       p2 = `${esc(W.nm)} venceu em <b>${sW.filter(r => r.uf !== 'zz').length}</b> das 27 unidades da federação; ${esc(L.nm)}, em <b>${sL.filter(r => r.uf !== 'zz').length}</b>${ties ? ` (${ties === 1 ? 'houve empate em uma' : `houve empate em ${ties}`})` : ''}.`;
       const noReg = (arr) => listPt(arr.map(r => 'no ' + r));
-      if (regW.length || regL.length) p2 += ` ${regW.length ? `${esc(W.nm)} liderou ${noReg(regW)}` : ''}${regW.length && regL.length ? '; ' : ''}${regL.length ? `${esc(L.nm)}, ${noReg(regL)}` : ''}.`;
+      if (regW.length && regL.length) p2 += ` ${esc(W.nm)} liderou ${noReg(regW)}; ${esc(L.nm)}, ${noReg(regL)}.`;
+      else if (regW.length) p2 += ` ${esc(W.nm)} liderou em todas as regiões.`;
+      else if (regL.length) p2 += ` Mesmo liderando ${noReg(regL)}, ${esc(L.nm)} não conseguiu compensar a diferença nos estados mais populosos.`;
       const sw = strong(W)[0], sl = strong(L)[0];
       if (sw && sl) p2 += ` O maior reduto de ${esc(W.nm)} foi ${ufO(sw.uf)} (${pc2(shareOf(sw, W))}); o de ${esc(L.nm)}, ${ufO(sl.uf)} (${pc2(shareOf(sl, L))}).`;
       if (bigVotes) p2 += ` Em número de votos, a maior vantagem de ${esc(W.nm)} veio ${ufDe(bigVotes.uf)}, com saldo de ${votosTxt(bigVotes.margin)}.`;
@@ -2005,11 +2018,11 @@
 
     const stBar = (r, c, col) => { const v = shareOf(r, c); return `<div class="r-st"><span>${UF_FULL[r.uf]}</span><div class="r-sb"><i style="width:${v}%;background:${col}"></i></div><b>${pc2(v)}</b></div>`; };
     const when = last.when ? last.when.replace(' ', ' às ') : '';
-    const crowd = totalVisitors ? `${fmt.format(totalVisitors)} ${totalVisitors === 1 ? 'pessoa acompanhou' : 'pessoas acompanharam'} a apuração por aqui${lastTorcidaTotal ? `, com ${fmt.format(lastTorcidaTotal)} comemorações enviadas` : ''}.` : '';
+    const crowd = totalVisitors >= SOCIAL_MIN ? `${fmt.format(totalVisitors)} ${totalVisitors === 1 ? 'pessoa acompanhou' : 'pessoas acompanharam'} a apuração por aqui${lastTorcidaTotal ? `, com ${fmt.format(lastTorcidaTotal)} comemorações enviadas` : ''}.` : '';
 
     $('report').innerHTML = `
       <div class="r-kicker">Eleição presidencial 2026 · 2º turno · <b>Resultado final</b></div>
-      <h1 class="r-title"><span>${esc(W.nm)}</span> ${elected ? 'é eleito Presidente da República' : 'vence a apuração do 2º turno'}</h1>
+      <h1 class="r-title"><span>${esc(W.nm)}</span> ${elected ? 'é eleito Presidente da República' : 'vence o 2º turno'}</h1>
       <div class="r-by">Por <b>Alan Araújo</b></div>
       <div class="r-meta">Fonte: TSE · ${pstTxt(last.pst)} das urnas apuradas${when ? ' · totalização de ' + esc(when) : ''}</div>
 
@@ -2072,8 +2085,9 @@
   let lastViewers = -1;
   // números reais que só crescem: visitantes e comemorações desde o começo
   let lastTotal = -1, lastTorcidaTotal = 0, totalVisitors = 0, joinedN = 0, joinedT = 0;
+  const SOCIAL_MIN = 30;   // abaixo disso a linha de visitantes não aparece
   function renderSocial() {
-    if (!totalVisitors) return;
+    if (totalVisitors < SOCIAL_MIN) { $('social').hidden = true; return; }
     $('social').hidden = false;
     $('socialTxt').innerHTML = `<b>${fmt.format(totalVisitors)}</b> ${totalVisitors === 1 ? 'pessoa já passou' : 'pessoas já passaram'} por aqui`
       + (lastTorcidaTotal ? ` · <b>${short(lastTorcidaTotal)}</b> ${lastTorcidaTotal === 1 ? 'comemoração' : 'comemorações'}` : '');
@@ -2093,7 +2107,7 @@
       lastTotal = st.total; totalVisitors = st.total; renderSocial();
     }
     if (st.viewers == null) return;
-    $('viewers').hidden = false; $('audience').hidden = false;
+    $('viewers').hidden = st.viewers < 5; $('audience').hidden = (st.total || 0) < SOCIAL_MIN;
     $('viewersN').textContent = fmt.format(st.viewers);
     if (lastViewers >= 0 && st.viewers > lastViewers) { $('viewers').classList.remove('bump'); void $('viewers').offsetWidth; $('viewers').classList.add('bump'); setTimeout(() => $('viewers').classList.remove('bump'), 900); }
     lastViewers = st.viewers;
@@ -2105,6 +2119,7 @@
     $('audSince').textContent = st.since ? 'Pessoas diferentes desde as ' + hm(st.since) : '—';
   }
   function onStatus(st) {
+    if (st.final && !serverFinal) { serverFinal = true; maybeReport(); }
     showAudience(st);
     if (st.torcida) { buildDock(); renderMeter(st.torcida); }
     pushSeen = Date.now();

@@ -67,7 +67,7 @@ function slim(j) {
   const el = j.e && typeof j.e === 'object' ? j.e : { te: j.e, a: j.a, pa: j.pa, pc: j.pc };
   const vt = j.v && typeof j.v === 'object' ? j.v : { vb: j.vb, tvn: j.tvn != null ? j.tvn : j.vn };
   return {
-    dg: j.dg, hg: j.hg,
+    dg: j.dg, hg: j.hg, tf: j.tf, md: j.md,
     s: { pst: sec.pst },
     e: { te: el.te, a: el.a, pa: el.pa, pc: el.pc },
     v: { vb: vt.vb, tvn: vt.tvn != null ? vt.tvn : vt.vn },
@@ -142,7 +142,9 @@ function setStatus(ok, err) {
 }
 // "ok" = conseguiu falar com o TSE nos últimos 5s; se não, as páginas passam a buscar direto no TSE
 const publicStatus = () => ({ ok: Date.now() - status.lastOk < 5000, lastOk: status.lastOk, now: Date.now(),
-  viewers: watching.size, total: seen.size, peak, peakAt, since, torcida: torcidaStatus() });
+  viewers: watching.size, total: seen.size, peak, peakAt, since, torcida: torcidaStatus(),
+  // FINAL=1 nas variáveis do Railway força o relatório final para todo mundo
+  final: /^(1|true|sim)$/i.test(process.env.FINAL || '') });
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
